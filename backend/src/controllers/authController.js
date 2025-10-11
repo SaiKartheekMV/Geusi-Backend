@@ -1,218 +1,347 @@
+const User = require("../models/User");
+const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
 
-// Minimal HS256 JWT (sign/verify) without external dependencies
-const jwt = {
-	sign(payload, secret, options = {}) {
-		const header = { alg: "HS256", typ: "JWT" };
-		const now = Math.floor(Date.now() / 1000);
-		const exp = options.expiresIn ? now + parseExpiry(options.expiresIn) : undefined;
-		const fullPayload = exp ? Object.assign({ iat: now, exp }, payload) : Object.assign({ iat: now }, payload);
-		const encodedHeader = base64UrlEncode(JSON.stringify(header));
-		const encodedPayload = base64UrlEncode(JSON.stringify(fullPayload));
-		const data = encodedHeader + "." + encodedPayload;
-		const signature = signHmacSha256(data, secret);
-		return data + "." + signature;
-	},
-	verify(token, secret) {
-		const parts = String(token).split(".");
-		if (parts.length !== 3) throw new Error("Invalid token format");
-		const encodedHeader = parts[0];
-		const encodedPayload = parts[1];
-		const signature = parts[2];
-		const data = encodedHeader + "." + encodedPayload;
-		const expected = signHmacSha256(data, secret);
-		if (!timingSafeEqual(signature, expected)) throw new Error("Invalid signature");
-		const payload = JSON.parse(base64UrlDecode(encodedPayload));
-		if (payload && payload.exp && Math.floor(Date.now() / 1000) > payload.exp) throw new Error("Token expired");
-		return payload;
-	},
+const generateAccessToken = (userId) => {
+  return jwt.sign({ userId }, process.env.JWT_ACCESS_SECRET, {
+    expiresIn: "1h",
+  });
 };
 
-function base64UrlEncode(input) {
-	return Buffer.from(input)
-		.toString("base64")
-		.replace(/=/g, "")
-		.replace(/\+/g, "-")
-		.replace(/\//g, "_");
-}
+const generateRefreshToken = (userId) => {
+  return jwt.sign({ userId }, process.env.JWT_REFRESH_SECRET, {
+    expiresIn: "30d",
+  });
+};
 
-function base64UrlDecode(input) {
-	const normalized = String(input).replace(/-/g, "+").replace(/_/g, "/");
-	const pad = (4 - (normalized.length % 4 || 4)) % 4;
-	return Buffer.from(normalized + "=".repeat(pad), "base64").toString("utf8");
-}
+const register = async (req, res) => {
+  try {
+    const { firstName, lastName, email, phone, password } = req.body;
 
-function signHmacSha256(data, secret) {
-	return crypto
-		.createHmac("sha256", secret)
-		.update(data)
-		.digest("base64")
-		.replace(/=/g, "")
-		.replace(/\+/g, "-")
-		.replace(/\//g, "_");
-}
+    if (!firstName || !lastName || !email || !phone || !password) {
+      return res.status(400).json({ message: "All fields are required" });
+    }
 
-function timingSafeEqual(a, b) { // To prevent Timing attacks by hackers
-	const aBuf = Buffer.from(String(a));
-	const bBuf = Buffer.from(String(b));
-	if (aBuf.length !== bBuf.length) return false;
-	return crypto.timingSafeEqual(aBuf, bBuf);
-}
+    if (password.length < 8) {
+      return res.status(400).json({ message: "Password must be at least 8 characters" });
+    }
 
-function parseExpiry(exp) {
-	if (typeof exp === "number") return exp; // seconds
-	const match = /^([0-9]+)([smhd])$/.exec(String(exp));
-	if (!match) return 0;
-	const n = parseInt(match[1], 10);
-	const unit = match[2];
-	switch (unit) {
-		case "s": return n;
-		case "m": return n * 60;
-		case "h": return n * 3600;
-		case "d": return n * 86400;
-		default: return 0;
-	}
-}
+    const existingUser = await User.findOne({
+      $or: [{ email }, { phone }],
+    });
 
-const JWT_EXPIRY = "3600";
-const JWT_COOKIE_NAME = "token";
+    if (existingUser) {
+      if (existingUser.email === email) {
+        return res.status(400).json({ message: "Email already registered" });
+      }
+      if (existingUser.phone === phone) {
+        return res.status(400).json({ message: "Phone number already registered" });
+      }
+    }
 
-function getJwtSecret() {
-	return process.env.JWT_SECRET || "secret";
-}
+    const user = new User({
+      firstName,
+      lastName,
+      email,
+      phone,
+      password,
+    });
 
-function hashPassword(plainText) {
-	const salt = crypto.randomBytes(16);
-	const derivedKey = crypto.scryptSync(String(plainText), salt, 64);
-	return "scrypt$" + salt.toString("hex") + "$" + derivedKey.toString("hex");
-}
+    await user.save();
 
-function verifyPassword(plainText, stored) {
-	try {
-		const parts = String(stored).split("$");
-		if (parts.length !== 3 || parts[0] !== "scrypt") return false;
-		const salt = Buffer.from(parts[1], "hex");
-		const expected = Buffer.from(parts[2], "hex");
-		const derived = crypto.scryptSync(String(plainText), salt, expected.length);
-		return crypto.timingSafeEqual(expected, derived);
-	} catch (_) {
-		return false;
-	}
-}
+    const accessToken = generateAccessToken(user._id);
+    const refreshToken = generateRefreshToken(user._id);
 
-async function getUserModel() {
-	// models/user.js is ESM with default export
-	const mod = await import("../models/user.js");
-	return mod.default;
-}
+    user.refreshToken = refreshToken;
+    await user.save();
 
-function sanitizeUser(userDoc) {
-	const obj = typeof userDoc.toObject === "function" ? userDoc.toObject() : userDoc;
-	const id = obj && obj._id && typeof obj._id.toString === "function" ? obj._id.toString() : obj._id;
-	return {
-		id: id,
-		firstName: obj.firstName,
-		lastName: obj.lastName,
-		username: obj.username,
-		email: obj.email,
-		phone: obj.phone,
-		role: obj.role,
-		profileImage: obj.profileImage,
-	};
-}
+    const userResponse = {
+      id: user._id,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      email: user.email,
+      phone: user.phone,
+      emailVerified: user.emailVerified,
+      phoneVerified: user.phoneVerified,
+      accountStatus: user.accountStatus,
+      profileImage: user.profileImage,
+      createdAt: user.createdAt,
+    };
 
-async function register(req, res) {
-	try {
-		const User = await getUserModel();
-		const body = req.body || {};
-		const firstName = body.firstName;
-		const lastName = body.lastName;
-		const email = body.email;
-		const username = body.username;
-		const phone = body.phone;
-		const password = body.password;
-		if (!firstName || !email || !password) {
-			return res.status(400).json({ message: "firstName, email and password are required" });
-		}
-		const existing = await User.findOne({ $or: [{ email: email }, { username: username }, { phone: phone }] });
-		if (existing) {
-			return res.status(409).json({ message: "User already exists" });
-		}
-		const passwordHash = hashPassword(password);
-		const created = await User.create({ firstName: firstName, lastName: lastName, email: email, username: username, phone: phone, password: passwordHash });
-		const token = jwt.sign({ sub: String(created._id), role: created.role }, getJwtSecret(), { expiresIn: 3600 });
-		setAuthCookie(res, token);
-		return res.status(201).json({ user: sanitizeUser(created), token: token });
-	} catch (err) {
-		return res.status(500).json({ message: err && err.message ? err.message : "Registration failed" });
-	}
-}
+    res.status(201).json({
+      message: "User registered successfully",
+      user: userResponse,
+      accessToken,
+      refreshToken,
+    });
+  } catch (error) {
+    console.error("Registration error:", error);
+    res.status(500).json({ message: "Registration failed", error: error.message });
+  }
+};
 
-async function login(req, res) {
-	try {
-		const User = await getUserModel();
-		const body = req.body || {};
-		const email = body.email;
-		const username = body.username;
-		const phone = body.phone;
-		const password = body.password;
-		if (!password || (!email && !username && !phone)) {
-			return res.status(400).json({ message: "Provide email/username/phone and password" });
-		}
-		const query = email ? { email: email } : (username ? { username: username } : { phone: phone });
-		const user = await User.findOne(query);
-		if (!user || !verifyPassword(password, user.password)) {
-			return res.status(401).json({ message: "Invalid credentials" });
-		}
-		const token = jwt.sign({ sub: String(user._id), role: user.role }, getJwtSecret(), { expiresIn: JWT_EXPIRY });
-		setAuthCookie(res, token);
-		return res.status(200).json({ user: sanitizeUser(user), token: token });
-	} catch (err) {
-		return res.status(500).json({ message: err && err.message ? err.message : "Login failed" });
-	}
-}
+const login = async (req, res) => {
+  try {
+    const { email, password } = req.body;
 
-async function me(req, res) { // To check when user came back is authenticated or not?
-	try {
-		const token = getTokenFromRequest(req);
-		if (!token) return res.status(401).json({ message: "Not authenticated" });
-		const payload = jwt.verify(token, getJwtSecret());
-		const User = await getUserModel();
-		const user = await User.findById(payload.sub);
-		if (!user) return res.status(404).json({ message: "User not found" });
-		return res.status(200).json({ user: sanitizeUser(user) });
-	} catch (err) {
-		return res.status(401).json({ message: err && err.message ? err.message : "Invalid token" });
-	}
-}
+    if (!email || !password) {
+      return res.status(400).json({ message: "Email and password are required" });
+    }
 
-async function logout(req, res) {
-	clearAuthCookie(res);
-	return res.status(200).json({ message: "Logged out" });
-}
+    const user = await User.findOne({ email });
 
-function setAuthCookie(res, token) {
-	const isProd = process.env.NODE_ENV === "production";
-	res.cookie(JWT_COOKIE_NAME, token, {
-		httpOnly: true,
-		secure: isProd,
-		sameSite: isProd ? "none" : "lax",
-		maxAge: 7 * 24 * 60 * 60 * 1000,
-		path: "/",
-	});
-}
+    if (!user) {
+      return res.status(401).json({ message: "Invalid email or password" });
+    }
 
-function clearAuthCookie(res) {
-	res.clearCookie(JWT_COOKIE_NAME, { path: "/" });
-}
+    if (user.accountStatus !== "active") {
+      return res.status(403).json({ message: "Account is not active" });
+    }
 
-function getTokenFromRequest(req) {
-	if (req.cookies && req.cookies[JWT_COOKIE_NAME]) return req.cookies[JWT_COOKIE_NAME];
-	const auth = req.headers && (req.headers["authorization"] || req.headers["Authorization"]);
-	if (auth && typeof auth === "string" && auth.indexOf("Bearer ") === 0) return auth.slice(7);
-	return null;
-}
+    const isPasswordValid = await user.comparePassword(password);
 
-module.exports = { register, login, me, logout };
+    if (!isPasswordValid) {
+      return res.status(401).json({ message: "Invalid email or password" });
+    }
 
+    const accessToken = generateAccessToken(user._id);
+    const refreshToken = generateRefreshToken(user._id);
 
+    user.refreshToken = refreshToken;
+    await user.save();
+
+    const userResponse = {
+      id: user._id,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      email: user.email,
+      phone: user.phone,
+      emailVerified: user.emailVerified,
+      phoneVerified: user.phoneVerified,
+      accountStatus: user.accountStatus,
+      profileImage: user.profileImage,
+      householdSize: user.householdSize,
+      preferences: user.preferences,
+      subscription: user.subscription,
+    };
+
+    res.status(200).json({
+      message: "Login successful",
+      user: userResponse,
+      accessToken,
+      refreshToken,
+    });
+  } catch (error) {
+    console.error("Login error:", error);
+    res.status(500).json({ message: "Login failed", error: error.message });
+  }
+};
+
+const logout = async (req, res) => {
+  try {
+    const { refreshToken } = req.body;
+
+    if (!refreshToken) {
+      return res.status(400).json({ message: "Refresh token required" });
+    }
+
+    const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
+
+    const user = await User.findById(decoded.userId);
+
+    if (user) {
+      user.refreshToken = null;
+      await user.save();
+    }
+
+    res.status(200).json({ message: "Logout successful" });
+  } catch (error) {
+    res.status(200).json({ message: "Logout successful" });
+  }
+};
+
+const me = async (req, res) => {
+  try {
+    const userResponse = {
+      id: req.user._id,
+      firstName: req.user.firstName,
+      lastName: req.user.lastName,
+      email: req.user.email,
+      phone: req.user.phone,
+      emailVerified: req.user.emailVerified,
+      phoneVerified: req.user.phoneVerified,
+      accountStatus: req.user.accountStatus,
+      profileImage: req.user.profileImage,
+      householdSize: req.user.householdSize,
+      address: req.user.address,
+      currentLocation: req.user.currentLocation,
+      preferences: req.user.preferences,
+      subscription: req.user.subscription,
+      reservations: req.user.reservations,
+      createdAt: req.user.createdAt,
+      updatedAt: req.user.updatedAt,
+    };
+
+    res.status(200).json({ user: userResponse });
+  } catch (error) {
+    console.error("Get user error:", error);
+    res.status(500).json({ message: "Failed to get user data", error: error.message });
+  }
+};
+
+const refreshToken = async (req, res) => {
+  try {
+    const { refreshToken } = req.body;
+
+    if (!refreshToken) {
+      return res.status(400).json({ message: "Refresh token required" });
+    }
+
+    const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
+
+    const user = await User.findById(decoded.userId);
+
+    if (!user || user.refreshToken !== refreshToken) {
+      return res.status(401).json({ message: "Invalid refresh token" });
+    }
+
+    if (user.accountStatus !== "active") {
+      return res.status(403).json({ message: "Account is not active" });
+    }
+
+    const newAccessToken = generateAccessToken(user._id);
+    const newRefreshToken = generateRefreshToken(user._id);
+
+    user.refreshToken = newRefreshToken;
+    await user.save();
+
+    res.status(200).json({
+      message: "Token refreshed successfully",
+      accessToken: newAccessToken,
+      refreshToken: newRefreshToken,
+    });
+  } catch (error) {
+    if (error.name === "TokenExpiredError") {
+      return res.status(401).json({ message: "Refresh token expired" });
+    }
+    if (error.name === "JsonWebTokenError") {
+      return res.status(401).json({ message: "Invalid refresh token" });
+    }
+    res.status(500).json({ message: "Token refresh failed", error: error.message });
+  }
+};
+
+const changePassword = async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ message: "Current password and new password are required" });
+    }
+
+    if (newPassword.length < 8) {
+      return res.status(400).json({ message: "New password must be at least 8 characters" });
+    }
+
+    const user = await User.findById(req.user._id);
+
+    const isPasswordValid = await user.comparePassword(currentPassword);
+
+    if (!isPasswordValid) {
+      return res.status(401).json({ message: "Current password is incorrect" });
+    }
+
+    user.password = newPassword;
+    user.refreshToken = null;
+    await user.save();
+
+    res.status(200).json({ message: "Password changed successfully. Please login again." });
+  } catch (error) {
+    console.error("Change password error:", error);
+    res.status(500).json({ message: "Password change failed", error: error.message });
+  }
+};
+
+const forgotPassword = async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ message: "Email is required" });
+    }
+
+    const user = await User.findOne({ email });
+
+    if (!user) {
+      return res.status(200).json({ message: "If the email exists, a reset link has been sent" });
+    }
+
+    const resetToken = crypto.randomBytes(32).toString("hex");
+    const hashedToken = crypto.createHash("sha256").update(resetToken).digest("hex");
+
+    user.resetPasswordToken = hashedToken;
+    user.resetPasswordExpires = Date.now() + 3600000;
+    await user.save();
+
+    const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${resetToken}`;
+
+    console.log("Password reset token:", resetToken);
+    console.log("Reset URL:", resetUrl);
+
+    res.status(200).json({
+      message: "Password reset token generated",
+      resetToken,
+      resetUrl,
+    });
+  } catch (error) {
+    console.error("Forgot password error:", error);
+    res.status(500).json({ message: "Failed to process request", error: error.message });
+  }
+};
+
+const resetPassword = async (req, res) => {
+  try {
+    const { token, newPassword } = req.body;
+
+    if (!token || !newPassword) {
+      return res.status(400).json({ message: "Token and new password are required" });
+    }
+
+    if (newPassword.length < 8) {
+      return res.status(400).json({ message: "Password must be at least 8 characters" });
+    }
+
+    const hashedToken = crypto.createHash("sha256").update(token).digest("hex");
+
+    const user = await User.findOne({
+      resetPasswordToken: hashedToken,
+      resetPasswordExpires: { $gt: Date.now() },
+    });
+
+    if (!user) {
+      return res.status(400).json({ message: "Invalid or expired reset token" });
+    }
+
+    user.password = newPassword;
+    user.resetPasswordToken = null;
+    user.resetPasswordExpires = null;
+    user.refreshToken = null;
+    await user.save();
+
+    res.status(200).json({ message: "Password reset successful. Please login with your new password." });
+  } catch (error) {
+    console.error("Reset password error:", error);
+    res.status(500).json({ message: "Password reset failed", error: error.message });
+  }
+};
+
+module.exports = {
+  register,
+  login,
+  logout,
+  me,
+  refreshToken,
+  changePassword,
+  forgotPassword,
+  resetPassword,
+};

@@ -2,7 +2,6 @@ import mongoose from "mongoose";
 
 const userSchema = new mongoose.Schema(
   {
-    //Basic Info
     firstName: {
       type: String,
       required: true,
@@ -10,25 +9,30 @@ const userSchema = new mongoose.Schema(
     },
     lastName: {
       type: String,
-      trim: true,
-    },
-    username: {
-      type: String,
-      unique: true,
+      required: true,
       trim: true,
     },
 
-    //Contact & Auth
     email: {
       type: String,
+      required: true,
       unique: true,
-      sparse: true,
       lowercase: true,
+      trim: true,
+    },
+    emailVerified: {
+      type: Boolean,
+      default: false,
     },
     phone: {
       type: String,
+      required: true,
       unique: true,
-      sparse: true,
+      trim: true,
+    },
+    phoneVerified: {
+      type: Boolean,
+      default: false,
     },
     password: {
       type: String,
@@ -39,37 +43,48 @@ const userSchema = new mongoose.Schema(
       expiresAt: Date,
     },
 
-    //Role Management
-    role: {
+    accountStatus: {
       type: String,
-      enum: ["user", "chef", "admin"],
-      default: "user",
+      enum: ["active", "inactive", "suspended"],
+      default: "active",
     },
 
-    //Profile Details
     profileImage: {
-      type: String, // URL of profile pic
+      type: String,
       default: "",
     },
-    about: {
-      type: String,
-      trim: true,
-    },
-    rating: {
+
+    householdSize: {
       type: Number,
-      default: 0,
-    },
-    totalReviews: {
-      type: Number,
-      default: 0,
+      min: 1,
+      default: 1,
     },
 
-    //Address & Location
     address: {
-      street: String,
-      city: String,
-      state: String,
-      pincode: String,
+      street: {
+        type: String,
+        required: function() {
+          return this.address && (this.address.city || this.address.state || this.address.pincode);
+        },
+      },
+      city: {
+        type: String,
+        required: function() {
+          return this.address && (this.address.street || this.address.state || this.address.pincode);
+        },
+      },
+      state: {
+        type: String,
+        required: function() {
+          return this.address && (this.address.street || this.address.city || this.address.pincode);
+        },
+      },
+      pincode: {
+        type: String,
+        required: function() {
+          return this.address && (this.address.street || this.address.city || this.address.state);
+        },
+      },
       coordinates: {
         lat: Number,
         lng: Number,
@@ -80,22 +95,33 @@ const userSchema = new mongoose.Schema(
       default: "",
     },
 
-    //Preferences & Settings
     preferences: {
-      cuisines: [String], // ["Indian", "Korean", "Healthy", etc.]
+      cuisines: [String],
       dietaryType: {
         type: String,
         enum: ["Veg", "Non-Veg", "Vegan", "Other"],
         default: "Veg",
       },
+      allergies: [String],
       occasion: String,
-      notificationsEnabled: { type: Boolean, default: true },
-      language: { type: String, default: "English" },
-      accessibility: { type: Boolean, default: false },
-      privacyAccepted: { type: Boolean, default: false },
+      notificationsEnabled: {
+        type: Boolean,
+        default: true,
+      },
+      language: {
+        type: String,
+        default: "English",
+      },
+      accessibility: {
+        type: Boolean,
+        default: false,
+      },
+      privacyAccepted: {
+        type: Boolean,
+        default: false,
+      },
     },
 
-    //Subscription / Payment
     subscription: {
       plan: {
         type: String,
@@ -104,11 +130,13 @@ const userSchema = new mongoose.Schema(
       },
       startDate: Date,
       expiryDate: Date,
-      paymentMethod: String, // "UPI", "Credit Card", etc.
-      isActive: { type: Boolean, default: false },
+      paymentMethod: String,
+      isActive: {
+        type: Boolean,
+        default: false,
+      },
     },
 
-    //Reservation / Order Reference
     reservations: [
       {
         type: mongoose.Schema.Types.ObjectId,
@@ -116,22 +144,50 @@ const userSchema = new mongoose.Schema(
       },
     ],
 
-    //Notifications
     notifications: [
       {
         message: String,
-        type: { type: String }, // "chef-assigned", "order-updated", etc.
-        isRead: { type: Boolean, default: false },
-        createdAt: { type: Date, default: Date.now },
+        type: {
+          type: String,
+        },
+        isRead: {
+          type: Boolean,
+          default: false,
+        },
+        createdAt: {
+          type: Date,
+          default: Date.now,
+        },
       },
     ],
 
-    createdAt: {
+    refreshToken: {
+      type: String,
+      default: null,
+    },
+    resetPasswordToken: {
+      type: String,
+      default: null,
+    },
+    resetPasswordExpires: {
       type: Date,
-      default: Date.now,
+      default: null,
     },
   },
   { timestamps: true }
 );
+
+userSchema.pre("save", async function (next) {
+  if (!this.isModified("password")) return next();
+  
+  const bcrypt = require("bcryptjs");
+  this.password = await bcrypt.hash(this.password, 10);
+  next();
+});
+
+userSchema.methods.comparePassword = async function (candidatePassword) {
+  const bcrypt = require("bcryptjs");
+  return await bcrypt.compare(candidatePassword, this.password);
+};
 
 export default mongoose.model("User", userSchema);
