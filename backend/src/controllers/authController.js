@@ -1,6 +1,7 @@
 const User = require("../models/User");
 const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
+const { sendPasswordResetEmail } = require("../services/emailService");
 
 const generateAccessToken = (userId) => {
   return jwt.sign({ userId }, process.env.JWT_ACCESS_SECRET, {
@@ -283,15 +284,18 @@ const forgotPassword = async (req, res) => {
     user.resetPasswordExpires = Date.now() + 3600000;
     await user.save();
 
-    const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${resetToken}`;
+    const userName = `${user.firstName} ${user.lastName}`;
+    const emailResult = await sendPasswordResetEmail(email, resetToken, userName);
 
-    console.log("Password reset token:", resetToken);
-    console.log("Reset URL:", resetUrl);
+    if (!emailResult.success) {
+      user.resetPasswordToken = null;
+      user.resetPasswordExpires = null;
+      await user.save();
+      return res.status(500).json({ message: "Failed to send reset email. Please try again later." });
+    }
 
     res.status(200).json({
-      message: "Password reset token generated",
-      resetToken,
-      resetUrl,
+      message: "Password reset link has been sent to your email",
     });
   } catch (error) {
     console.error("Forgot password error:", error);

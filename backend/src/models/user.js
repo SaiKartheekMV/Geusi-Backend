@@ -84,7 +84,7 @@ const userSchema = new mongoose.Schema(
         required: function() {
           return this.address && (this.address.street || this.address.city || this.address.state);
         },
-      }
+      },
     },
     currentLocation: {
       type: String,
@@ -185,4 +185,4 @@ userSchema.methods.comparePassword = async function (candidatePassword) {
   return await bcrypt.compare(candidatePassword, this.password);
 };
 
-export default mongoose.models.User || mongoose.model("User", userSchema);
+export default mongoose.model("User", userSchema);
