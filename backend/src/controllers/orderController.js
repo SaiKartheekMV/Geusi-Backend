@@ -1,5 +1,6 @@
-const Order = require("../models/order");
+const Order = require("../models/Order");
 const User = require("../models/User");
+const Chef = require("../models/Chef");
 
 // Helper function to add notification
 const addNotification = async (userId, message, type) => {
@@ -82,9 +83,12 @@ const getOrders = async (req, res) => {
 
     let query = { user: req.user._id };
 
-    // Search by food name or description
+    // Search by food name or description (simple string matching)
     if (search) {
-      query.$text = { $search: search };
+      query.$or = [
+        { foodName: { $regex: search, $options: "i" } },
+        { description: { $regex: search, $options: "i" } },
+      ];
     }
 
     // Filter by status
@@ -95,6 +99,7 @@ const getOrders = async (req, res) => {
     const skip = (page - 1) * limit;
 
     const orders = await Order.find(query)
+      .populate("chef", "firstName lastName phone")
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(parseInt(limit));
@@ -123,7 +128,7 @@ const getOrderById = async (req, res) => {
     const order = await Order.findOne({
       _id: id,
       user: req.user._id,
-    });
+    }).populate("chef", "firstName lastName phone profileImage");
 
     if (!order) {
       return res.status(404).json({ message: "Order not found" });
@@ -146,6 +151,7 @@ const getOrderHistory = async (req, res) => {
       user: req.user._id,
       status: { $in: ["delivered", "cancelled"] },
     })
+      .populate("chef", "firstName lastName")
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(parseInt(limit));
@@ -200,15 +206,6 @@ const cancelOrder = async (req, res) => {
       "order_cancelled"
     );
 
-    // Notify chef if assigned (when Chef model exists)
-    if (order.chef) {
-      await addNotification(
-        order.chef,
-        `Order #${order._id.toString().slice(-6)} has been cancelled by customer`,
-        "order_cancelled"
-      );
-    }
-
     res.status(200).json({
       message: "Order cancelled successfully",
       order,
@@ -219,7 +216,7 @@ const cancelOrder = async (req, res) => {
   }
 };
 
-// Delete order (only if new/cancelled)
+// Delete order (only if cancelled)
 const deleteOrder = async (req, res) => {
   try {
     const { id } = req.params;
@@ -233,8 +230,11 @@ const deleteOrder = async (req, res) => {
       return res.status(404).json({ message: "Order not found" });
     }
 
-    if (!["new", "cancelled"].includes(order.status)) {
-      return res.status(400).json({ message: "Can only delete new or cancelled orders" });
+    // Only allow deletion of cancelled orders
+    if (order.status !== "cancelled") {
+      return res.status(400).json({ 
+        message: "Can only delete cancelled orders. Please cancel the order first." 
+      });
     }
 
     await Order.findByIdAndDelete(id);
@@ -282,48 +282,6 @@ const markNotificationRead = async (req, res) => {
   }
 };
 
-// Update order status (TEST/ADMIN ONLY)
-const updateOrderStatus = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { status } = req.body;
-
-    if (!status) {
-      return res.status(400).json({ message: "Status is required" });
-    }
-
-    const validStatuses = ["new", "confirmed", "preparing", "on_the_way", "delivered", "cancelled"];
-    if (!validStatuses.includes(status)) {
-      return res.status(400).json({ message: "Invalid status" });
-    }
-
-    const order = await Order.findOneAndUpdate(
-      { _id: id, user: req.user._id },
-      { status },
-      { new: true }
-    );
-
-    if (!order) {
-      return res.status(404).json({ message: "Order not found" });
-    }
-
-    // Add notification for status change
-    await addNotification(
-      req.user._id,
-      `Your order for ${order.foodName} status updated to ${status}`,
-      "order_status_updated"
-    );
-
-    res.status(200).json({ 
-      message: "Status updated successfully", 
-      order 
-    });
-  } catch (error) {
-    console.error("Update status error:", error);
-    res.status(500).json({ message: "Failed to update status", error: error.message });
-  }
-};
-
 module.exports = {
   createOrder,
   getOrders,
@@ -333,5 +291,4 @@ module.exports = {
   deleteOrder,
   getNotifications,
   markNotificationRead,
-  updateOrderStatus,
 };

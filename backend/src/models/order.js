@@ -79,9 +79,4 @@ const orderSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-// Indexes for faster searching
-orderSchema.index({ user: 1, status: 1, createdAt: -1 });
-orderSchema.index({ chef: 1, status: 1 });
-orderSchema.index({ foodName: "text", description: "text" });
-
 module.exports = mongoose.model("Order", orderSchema);
