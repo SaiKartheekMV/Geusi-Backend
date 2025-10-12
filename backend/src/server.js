@@ -20,6 +20,8 @@ app.use(
     })
 );
 app.use(express.urlencoded({ extended: true }));
+
+// Error handling middleware
 app.use((err, req, res, next) => {
     console.error(err.stack);
     res.status(err.status || 500).json({ message: err.message || "Something went wrong!" });
@@ -35,7 +37,6 @@ const connectDB = async () => {
         process.exit(1);
     }
 };
-
 connectDB();
 
 // Health Check Route
@@ -59,14 +60,15 @@ app.get("/api/health", async (req, res) => {
 });
 
 // Routes 
-
 const authRouter = require("./routes/authRoute");
+const orderRouter = require("./routes/orderRoute");
+
 app.use("/api/auth", authRouter);
+app.use("/api/orders", orderRouter);
 
 const server = app.listen(PORT, () => {
     console.log(`Server running on Port: ${PORT}`);
 });
-
 
 const shutdown = () => {
     server.close(() => {
