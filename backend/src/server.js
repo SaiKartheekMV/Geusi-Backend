@@ -63,10 +63,16 @@ app.get("/api/health", async (req, res) => {
 const authRouter = require("./routes/authRoute");
 const orderRouter = require("./routes/orderRoute");
 const cookAuthRouter = require("./routes/cookAuthRoute");
+const profileRouter = require("./routes/profileRoute");
 
+
+app.use("/uploads", express.static("uploads"));
 app.use("/api/auth", authRouter);
 app.use("/api/cook-auth", cookAuthRouter);
 app.use("/api/orders", orderRouter);
+app.use("/api/profile", profileRouter);
+
+
 
 const server = app.listen(PORT, () => {
     console.log(`Server running on Port: ${PORT}`);
