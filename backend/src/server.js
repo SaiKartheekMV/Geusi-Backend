@@ -4,6 +4,7 @@ const cors = require("cors");
 const mongoose = require("mongoose");
 const helmet = require("helmet");
 const morgan = require("morgan");
+const profileRouter = require("./routes/profileRoute");
 require("dotenv").config();
 
 const app = express();
@@ -25,7 +26,9 @@ app.use(express.urlencoded({ extended: true }));
 app.use((err, req, res, next) => {
     console.error(err.stack);
     res.status(err.status || 500).json({ message: err.message || "Something went wrong!" });
+
 });
+app.use("/api/profile", profileRouter);
 
 // Database connection
 const connectDB = async () => {
