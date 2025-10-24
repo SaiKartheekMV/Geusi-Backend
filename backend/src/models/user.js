@@ -132,10 +132,10 @@ const userSchema = new mongoose.Schema(
       },
     },
 
-    reservations: [
+    assignments: [
       {
         type: mongoose.Schema.Types.ObjectId,
-        ref: "Reservation",
+        ref: "Assignment",
       },
     ],
 

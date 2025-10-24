@@ -2,7 +2,6 @@ const User = require("../models/User");
 const path = require("path");
 const fs = require("fs");
 
-// Get user profile
 exports.getProfile = async (req, res) => {
   try {
     const user = await User.findById(req.user._id).select("-password -refreshToken");
@@ -14,7 +13,6 @@ exports.getProfile = async (req, res) => {
   }
 };
 
-// Update profile (text fields)
 exports.updateProfile = async (req, res) => {
   try {
     const updates = req.body;
@@ -28,7 +26,6 @@ exports.updateProfile = async (req, res) => {
   }
 };
 
-// Update profile image
 exports.updateProfileImage = async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ message: "No image uploaded" });
@@ -36,7 +33,6 @@ exports.updateProfileImage = async (req, res) => {
     const user = await User.findById(req.user._id);
     if (!user) return res.status(404).json({ message: "User not found" });
 
-    // Delete old image if exists
     if (user.profileImage) {
       const oldPath = path.join(__dirname, "..", user.profileImage);
       if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
@@ -51,7 +47,6 @@ exports.updateProfileImage = async (req, res) => {
   }
 };
 
-// Delete profile (soft delete or permanent)
 exports.deleteProfile = async (req, res) => {
   try {
     const user = await User.findByIdAndDelete(req.user._id);

@@ -2,13 +2,11 @@ const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
 
-// Create uploads folder if not exist
 const uploadDir = path.join(__dirname, "../uploads/profile");
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }
 
-// Storage config
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     cb(null, uploadDir);
@@ -20,7 +18,6 @@ const storage = multer.diskStorage({
   },
 });
 
-// File filter (only images)
 const fileFilter = (req, file, cb) => {
   const allowed = ["image/jpeg", "image/png", "image/jpg"];
   if (allowed.includes(file.mimetype)) {
