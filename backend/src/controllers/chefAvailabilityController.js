@@ -31,7 +31,7 @@ const updateSchedule = async (req, res) => {
       return res.status(400).json({ message: "Schedule must be an array" });
     }
     
-    // Validate schedule format
+
     for (const day of schedule) {
       if (!day.day || !Array.isArray(day.slots)) {
         return res.status(400).json({ message: "Invalid schedule format" });

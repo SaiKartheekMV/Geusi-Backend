@@ -114,7 +114,7 @@ const schemas = {
   }),
   
   orderUpdate: Joi.object({
-    status: Joi.string().valid("new", "confirmed", "preparing", "on_the_way", "delivered", "cancelled").optional(),
+    status: Joi.string().valid("new", "confirmed", "preparing", "onTheWay", "delivered", "cancelled").optional(),
     cancelReason: Joi.string().trim().max(200).optional(),
     actualPrice: Joi.number().min(0).max(10000).optional(),
   }),
@@ -161,7 +161,7 @@ const schemas = {
   
   orderSearch: Joi.object({
     search: Joi.string().trim().max(100).optional(),
-    status: Joi.string().valid("new", "confirmed", "preparing", "on_the_way", "delivered", "cancelled").optional(),
+    status: Joi.string().valid("new", "confirmed", "preparing", "onTheWay", "delivered", "cancelled").optional(),
     page: Joi.number().integer().min(1).optional(),
     limit: Joi.number().integer().min(1).max(100).optional(),
   }),
@@ -251,14 +251,14 @@ const schemas = {
   }),
   
   chefOrderSearch: Joi.object({
-    status: Joi.string().valid("new", "confirmed", "preparing", "on_the_way", "delivered", "cancelled").optional(),
+    status: Joi.string().valid("new", "confirmed", "preparing", "onTheWay", "delivered", "cancelled").optional(),
     orderType: Joi.string().valid("individual", "subscription").optional(),
     page: Joi.number().integer().min(1).optional(),
     limit: Joi.number().integer().min(1).max(100).optional(),
   }),
   
   orderStatusUpdate: Joi.object({
-    status: Joi.string().valid("confirmed", "preparing", "on_the_way", "delivered").required(),
+    status: Joi.string().valid("confirmed", "preparing", "onTheWay", "delivered").required(),
     notes: Joi.string().trim().max(200).optional(),
     preparationTime: Joi.number().integer().min(0).max(480).optional(),
     deliveryTime: Joi.number().integer().min(0).max(120).optional(),

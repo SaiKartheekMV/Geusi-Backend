@@ -2,9 +2,6 @@ const Review = require("../models/Review");
 const Chef = require("../models/Chef");
 const Order = require("../models/Order");
 
-/**
- * Create a new review
- */
 const createReview = async (req, res) => {
   try {
     const { orderId, rating, comment, images } = req.body;
@@ -13,24 +10,24 @@ const createReview = async (req, res) => {
       return res.status(400).json({ message: "Order ID and rating are required" });
     }
     
-    // Verify the order exists and belongs to the user
+
     const order = await Order.findOne({ 
       _id: orderId,
       user: req.user._id,
-      status: "delivered" // Only delivered orders can be reviewed
+      status: "delivered"
     });
     
     if (!order) {
       return res.status(404).json({ message: "Order not found or not eligible for review" });
     }
     
-    // Check if review already exists
+
     const existingReview = await Review.findOne({ order: orderId });
     if (existingReview) {
       return res.status(400).json({ message: "You have already reviewed this order" });
     }
     
-    // Create the review
+
     const review = new Review({
       user: req.user._id,
       chef: order.chef,
@@ -42,7 +39,7 @@ const createReview = async (req, res) => {
     
     await review.save();
     
-    // Update chef's rating
+
     await updateChefRating(order.chef);
     
     return res.status(201).json({ 
@@ -55,9 +52,6 @@ const createReview = async (req, res) => {
   }
 };
 
-/**
- * Get reviews for a chef
- */
 const getChefReviews = async (req, res) => {
   try {
     const { chefId } = req.params;
@@ -73,9 +67,6 @@ const getChefReviews = async (req, res) => {
   }
 };
 
-/**
- * Get reviews by a user
- */
 const getUserReviews = async (req, res) => {
   try {
     const reviews = await Review.find({ user: req.user._id })
@@ -90,9 +81,6 @@ const getUserReviews = async (req, res) => {
   }
 };
 
-/**
- * Update a review
- */
 const updateReview = async (req, res) => {
   try {
     const { reviewId } = req.params;
@@ -107,7 +95,7 @@ const updateReview = async (req, res) => {
       return res.status(404).json({ message: "Review not found" });
     }
     
-    // Only allow updates within 7 days of creation
+
     const daysSinceCreation = (Date.now() - review.createdAt) / (1000 * 60 * 60 * 24);
     if (daysSinceCreation > 7) {
       return res.status(400).json({ message: "Reviews can only be updated within 7 days of creation" });
@@ -119,7 +107,7 @@ const updateReview = async (req, res) => {
     
     await review.save();
     
-    // Update chef's rating
+
     await updateChefRating(review.chef);
     
     return res.status(200).json({ 
@@ -132,9 +120,6 @@ const updateReview = async (req, res) => {
   }
 };
 
-/**
- * Delete a review
- */
 const deleteReview = async (req, res) => {
   try {
     const { reviewId } = req.params;
@@ -152,7 +137,7 @@ const deleteReview = async (req, res) => {
     
     await review.deleteOne();
     
-    // Update chef's rating
+
     await updateChefRating(chefId);
     
     return res.status(200).json({ message: "Review deleted successfully" });
@@ -162,9 +147,6 @@ const deleteReview = async (req, res) => {
   }
 };
 
-/**
- * Helper function to update a chef's rating
- */
 const updateChefRating = async (chefId) => {
   const reviews = await Review.find({ chef: chefId });
   

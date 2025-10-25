@@ -2,6 +2,7 @@ const nodemailer = require("nodemailer");
 const User = require("../models/User");
 const Admin = require("../models/Admin");
 const Chef = require("../models/Chef");
+const { logger } = require("./loggerService");
 
 const transporter = nodemailer.createTransport({
   service: "gmail",
@@ -11,73 +12,129 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-const addNotificationToUser = async (userId, { message, type = "info", meta = {}, sendEmail = false }) => {
-  // Try to add notification to User, Admin, or Chef documents.
+const createServiceResponse = (success, data = null, message = "", error = null) => {
+  const response = {
+    success,
+    message,
+    timestamp: new Date().toISOString(),
+  };
+
+  if (success && data !== null) {
+    response.data = data;
+  }
+
+  if (!success && error) {
+    response.error = error.message || error;
+    if (process.env.NODE_ENV === "development" && error.stack) {
+      response.stack = error.stack;
+    }
+  }
+
+  return response;
+};
+
+const findUserById = async (userId) => {
   const models = [
     { name: 'User', model: User },
     { name: 'Admin', model: Admin },
     { name: 'Chef', model: Chef },
   ];
 
-  let target = null;
-  let targetModelName = null;
-  for (const m of models) {
-    const doc = await m.model.findById(userId);
-    if (doc) {
-      target = doc;
-      targetModelName = m.name;
-      break;
+  for (const { name, model } of models) {
+    try {
+      const doc = await model.findById(userId);
+      if (doc) {
+        return { user: doc, userType: name };
+      }
+    } catch (error) {
+      logger.error(`Error finding user in ${name} model:`, error);
     }
   }
 
-  if (!target) throw new Error('User not found');
+  return null;
+};
 
-  const notification = {
-    message,
-    type,
-    isRead: false,
-    createdAt: new Date(),
-    meta,
-  };
+const addNotificationToUser = async (userId, { message, type = "info", meta = {}, sendEmail = false }) => {
+  try {
+    if (!userId || !message) {
+      return createServiceResponse(false, null, "User ID and message are required", new Error("Invalid parameters"));
+    }
 
-  // Ensure notifications array exists on the target
-  target.notifications = target.notifications || [];
-  target.notifications.unshift(notification);
-  await target.save();
+    const userResult = await findUserById(userId);
+    if (!userResult) {
+      return createServiceResponse(false, null, "User not found", new Error("User not found"));
+    }
 
-  if (sendEmail && target.email) {
-    const mailOptions = {
-      from: `"Your App Name" <${process.env.EMAIL_USER}>`,
-      to: target.email,
-      subject: `New notification: ${type}`,
-      text: message,
-      html: `<p>${message}</p>`,
+    const { user, userType } = userResult;
+
+    const notification = {
+      message,
+      type,
+      isRead: false,
+      createdAt: new Date(),
+      meta,
     };
 
-    try {
-      await transporter.sendMail(mailOptions);
-    } catch (err) {
-      console.error("Failed to send notification email:", err.message);
-    }
-  }
+    user.notifications = user.notifications || [];
+    user.notifications.unshift(notification);
+    
+    await user.save();
 
-  return notification;
+    if (sendEmail && user.email) {
+      try {
+        const mailOptions = {
+          from: `"Your App Name" <${process.env.EMAIL_USER}>`,
+          to: user.email,
+          subject: `New notification: ${type}`,
+          text: message,
+          html: `<p>${message}</p>`,
+        };
+
+        await transporter.sendMail(mailOptions);
+        logger.info(`Notification email sent to ${user.email}`);
+      } catch (emailError) {
+        logger.error("Failed to send notification email:", emailError);
+      }
+    }
+
+    return createServiceResponse(true, notification, "Notification added successfully");
+  } catch (error) {
+    logger.error("Error adding notification:", error);
+    return createServiceResponse(false, null, "Failed to add notification", error);
+  }
 };
 
 const markNotificationRead = async (userId, notificationId) => {
-  const models = [User, Admin, Chef];
+  try {
+    if (!userId || !notificationId) {
+      return createServiceResponse(false, null, "User ID and notification ID are required", new Error("Invalid parameters"));
+    }
 
-  for (const model of models) {
-    const doc = await model.findById(userId);
-    if (!doc) continue;
-    const notif = doc.notifications.id(notificationId);
-    if (!notif) continue;
-    notif.isRead = true;
-    await doc.save();
-    return notif;
+    const models = [User, Admin, Chef];
+
+    for (const model of models) {
+      try {
+        const doc = await model.findById(userId);
+        if (!doc) continue;
+
+        const notification = doc.notifications.id(notificationId);
+        if (!notification) continue;
+
+        notification.isRead = true;
+        await doc.save();
+
+        return createServiceResponse(true, notification, "Notification marked as read");
+      } catch (error) {
+        logger.error(`Error marking notification read in ${model.modelName}:`, error);
+        continue;
+      }
+    }
+
+    return createServiceResponse(false, null, "Notification not found", new Error("Notification not found"));
+  } catch (error) {
+    logger.error("Error marking notification as read:", error);
+    return createServiceResponse(false, null, "Failed to mark notification as read", error);
   }
-
-  throw new Error('Notification not found');
 };
 
 module.exports = {

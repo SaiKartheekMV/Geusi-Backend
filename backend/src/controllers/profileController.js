@@ -1,59 +1,54 @@
 const User = require("../models/User");
 const path = require("path");
 const fs = require("fs");
+const { asyncHandler, sendResponse, sendErrorResponse } = require("../utils/controllerUtils");
 
-exports.getProfile = async (req, res) => {
-  try {
-    const user = await User.findById(req.user._id).select("-password -refreshToken");
-    if (!user) return res.status(404).json({ message: "User not found" });
-
-    res.status(200).json(user);
-  } catch (err) {
-    res.status(500).json({ message: err.message });
+exports.getProfile = asyncHandler(async (req, res) => {
+  const user = await User.findById(req.user._id).select("-password -refreshToken");
+  if (!user) {
+    return sendErrorResponse(res, 404, "User not found");
   }
-};
 
-exports.updateProfile = async (req, res) => {
-  try {
-    const updates = req.body;
-    const user = await User.findByIdAndUpdate(req.user._id, updates, { new: true }).select("-password -refreshToken");
+  sendResponse(res, 200, user, "Profile retrieved successfully");
+});
 
-    if (!user) return res.status(404).json({ message: "User not found" });
+exports.updateProfile = asyncHandler(async (req, res) => {
+  const updates = req.body;
+  const user = await User.findByIdAndUpdate(req.user._id, updates, { new: true }).select("-password -refreshToken");
 
-    res.status(200).json({ message: "Profile updated successfully", user });
-  } catch (err) {
-    res.status(500).json({ message: err.message });
+  if (!user) {
+    return sendErrorResponse(res, 404, "User not found");
   }
-};
 
-exports.updateProfileImage = async (req, res) => {
-  try {
-    if (!req.file) return res.status(400).json({ message: "No image uploaded" });
+  sendResponse(res, 200, { user }, "Profile updated successfully");
+});
 
-    const user = await User.findById(req.user._id);
-    if (!user) return res.status(404).json({ message: "User not found" });
-
-    if (user.profileImage) {
-      const oldPath = path.join(__dirname, "..", user.profileImage);
-      if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
-    }
-
-    user.profileImage = `uploads/profile/${req.file.filename}`;
-    await user.save();
-
-    res.status(200).json({ message: "Profile image updated", imagePath: user.profileImage });
-  } catch (err) {
-    res.status(500).json({ message: err.message });
+exports.updateProfileImage = asyncHandler(async (req, res) => {
+  if (!req.file) {
+    return sendErrorResponse(res, 400, "No image uploaded");
   }
-};
 
-exports.deleteProfile = async (req, res) => {
-  try {
-    const user = await User.findByIdAndDelete(req.user._id);
-    if (!user) return res.status(404).json({ message: "User not found" });
-
-    res.status(200).json({ message: "Account deleted successfully" });
-  } catch (err) {
-    res.status(500).json({ message: err.message });
+  const user = await User.findById(req.user._id);
+  if (!user) {
+    return sendErrorResponse(res, 404, "User not found");
   }
-};
+
+  if (user.profileImage) {
+    const oldPath = path.join(__dirname, "..", user.profileImage);
+    if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+  }
+
+  user.profileImage = `uploads/profile/${req.file.filename}`;
+  await user.save();
+
+  sendResponse(res, 200, { imagePath: user.profileImage }, "Profile image updated");
+});
+
+exports.deleteProfile = asyncHandler(async (req, res) => {
+  const user = await User.findByIdAndDelete(req.user._id);
+  if (!user) {
+    return sendErrorResponse(res, 404, "User not found");
+  }
+
+  sendResponse(res, 200, null, "Account deleted successfully");
+});

@@ -12,12 +12,12 @@ const {
   getUserSubscriptions,
 } = require("../controllers/subscriptionController");
 
-// Public to authenticated users (users only)
+
 router.get("/", authMiddleware, validateQuery(schemas.pagination), getUserSubscriptions);
 router.get("/:assignmentId/status", authMiddleware, validateParams(schemas.objectId), getUserSubscriptionStatus);
 router.patch("/:assignmentId/preferences", authMiddleware, validateParams(schemas.objectId), validateRequest(schemas.subscriptionPreferences), updateUserSubscriptionPreferences);
 
-// Admin-only routes
+
 router.use(adminAuthMiddleware);
 router.use(requirePermission("assignmentManagement"));
 

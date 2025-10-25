@@ -40,7 +40,7 @@ const adminAuthMiddleware = async (req, res, next) => {
 
 const requirePermission = (permission) => {
   return (req, res, next) => {
-    if (!req.user || !req.user.permissions[permission]) {
+    if (!req.user || !req.user.permissions || !req.user.permissions[permission]) {
       return res.status(403).json({ 
         message: `Access denied. Required permission: ${permission}` 
       });

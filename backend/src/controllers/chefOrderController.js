@@ -96,8 +96,8 @@ const updateOrderStatus = async (req, res) => {
 
     const validTransitions = {
       confirmed: ["preparing"],
-      preparing: ["on_the_way"],
-      on_the_way: ["delivered"],
+      preparing: ["onTheWay"],
+      onTheWay: ["delivered"],
     };
 
     if (!validTransitions[order.status]?.includes(status)) {
@@ -106,7 +106,7 @@ const updateOrderStatus = async (req, res) => {
       });
     }
 
-    // Process location data if provided
+
     let locationData = null;
     if (location) {
       locationData = {
@@ -116,7 +116,7 @@ const updateOrderStatus = async (req, res) => {
       };
     }
 
-    // Convert estimatedArrival to Date object if provided
+
     let estimatedArrivalDate = null;
     if (estimatedArrival) {
       estimatedArrivalDate = new Date(estimatedArrival);
@@ -134,7 +134,7 @@ const updateOrderStatus = async (req, res) => {
 
     await order.save();
     
-    // Send real-time notification about status change
+
     const io = req.app.get("io");
     await sendOrderStatusNotification(order.user, req.user._id, order, io);
 
@@ -209,7 +209,7 @@ const getChefOrderStats = async (req, res) => {
     });
     const activeOrders = await Order.countDocuments({
       chef: chefId,
-      status: { $in: ["confirmed", "preparing", "on_the_way"] },
+      status: { $in: ["confirmed", "preparing", "onTheWay"] },
     });
 
     const averageRating = await Order.aggregate([

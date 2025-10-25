@@ -59,7 +59,7 @@ const orderSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ["new", "confirmed", "preparing", "on_the_way", "delivered", "cancelled", "rejected"],
+      enum: ["new", "confirmed", "preparing", "onTheWay", "delivered", "cancelled", "rejected"],
       default: "new",
     },
     cancelReason: {
@@ -145,7 +145,7 @@ const orderSchema = new mongoose.Schema(
       {
         status: {
           type: String,
-          enum: ["new", "confirmed", "preparing", "on_the_way", "delivered", "cancelled", "rejected"],
+          enum: ["new", "confirmed", "preparing", "onTheWay", "delivered", "cancelled", "rejected"],
         },
         timestamp: {
           type: Date,
@@ -215,11 +215,11 @@ orderSchema.methods.canBeCancelled = function () {
 };
 
 orderSchema.methods.canBeUpdatedByChef = function () {
-  return ["confirmed", "preparing", "on_the_way"].includes(this.status);
+  return ["confirmed", "preparing", "onTheWay"].includes(this.status);
 };
 
 orderSchema.methods.isAssigned = function () {
-  return this.assignment && this.chef;
+  return !!(this.assignment && this.chef);
 };
 
 orderSchema.methods.getEstimatedDeliveryTime = function () {
