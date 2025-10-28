@@ -66,6 +66,7 @@ const orderTrackingRouter = require("./routes/orderTrackingRoutes");
 const chefAvailabilityRouter = require("./routes/chefAvailabilityRoutes");
 const chefProfileRouter = require("./routes/chefProfileRoutes");
 const reviewRouter = require("./routes/reviewRoutes");
+const searchRouter = require("./routes/searchRoute");
 
 app.use("/uploads", express.static("uploads"));
 app.use("/api/auth", authRouter);
@@ -81,6 +82,7 @@ app.use("/api/order-tracking", orderTrackingRouter);
 app.use("/api/chef-availability", chefAvailabilityRouter);
 app.use("/api/chef-profile", chefProfileRouter);
 app.use("/api/reviews", reviewRouter);
+app.use("/api/search", searchRouter);
 
 app.use(notFoundHandler);
 app.use(errorHandler);
