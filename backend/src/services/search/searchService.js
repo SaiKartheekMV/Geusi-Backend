@@ -1,11 +1,8 @@
-const Order = require("../../models/Order");
-const User = require("../../models/User");
+const Order = require("../../models/order");
+const User = require("../../models/user");
 const Chef = require("../../models/Chef");
 
-/**
- * Advanced search for orders with multiple filters
- * Supports: search text, status, date range, request type, pagination
- */
+
 const searchOrders = async (filters = {}) => {
   try {
     const {
@@ -22,7 +19,6 @@ const searchOrders = async (filters = {}) => {
 
     let query = {};
 
-    // Text search: Request ID, Food Name, Description
     if (search && search.trim() !== "") {
       const searchRegex = new RegExp(search.trim(), "i");
       
@@ -38,7 +34,7 @@ const searchOrders = async (filters = {}) => {
       ];
     }
 
-    // Status filter with custom mapping
+    
     if (status && status !== "" && status !== "all") {
       if (status === "pending") {
         query.status = "new";
@@ -52,7 +48,7 @@ const searchOrders = async (filters = {}) => {
       }
     }
 
-    // Request type: chef hiring vs custom order
+    
     if (requestType && requestType !== "" && requestType !== "all") {
       if (requestType === "chef_hiring") {
         query.scheduledDate = { $exists: true, $ne: null };
@@ -61,7 +57,7 @@ const searchOrders = async (filters = {}) => {
       }
     }
 
-    // Date range filter
+    
     if (startDate || endDate) {
       query.createdAt = {};
       
@@ -78,7 +74,7 @@ const searchOrders = async (filters = {}) => {
       }
     }
 
-    // Location filter
+    
     if (location && location.trim() !== "") {
       const locationRegex = new RegExp(location.trim(), "i");
       query.$or = query.$or || [];
@@ -89,7 +85,7 @@ const searchOrders = async (filters = {}) => {
       );
     }
 
-    // Assigned chef filter
+    
     if (assignedChef && assignedChef.trim() !== "") {
       query.chef = assignedChef;
     }
@@ -110,7 +106,7 @@ const searchOrders = async (filters = {}) => {
       .limit(parseInt(limit))
       .lean();
 
-    // Post-query filter for customer name search
+    
     if (search && search.trim() !== "") {
       const searchLower = search.toLowerCase();
       const filteredOrders = orders.filter((order) => {
@@ -189,9 +185,7 @@ const getOrderDetails = async (orderId) => {
   }
 };
 
-/**
- * Search users for admin management
- */
+
 const searchUsers = async (filters = {}) => {
   try {
     const {
@@ -240,9 +234,7 @@ const searchUsers = async (filters = {}) => {
   }
 };
 
-/**
- * Search chefs for admin management
- */
+
 const searchChefs = async (filters = {}) => {
   try {
     const {
@@ -296,9 +288,7 @@ const searchChefs = async (filters = {}) => {
   }
 };
 
-/**
- * Global search across orders, users, and chefs
- */
+
 const globalSearch = async (searchTerm, page = 1, limit = 5) => {
   try {
     if (!searchTerm || searchTerm.trim() === "") {

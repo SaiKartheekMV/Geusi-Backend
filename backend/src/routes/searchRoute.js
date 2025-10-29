@@ -9,10 +9,10 @@ const {
   globalSearch,
 } = require("../controllers/searchController");
 
-// All search routes require admin authentication
+
 router.use(adminAuthMiddleware);
 
-// Search routes
+
 router.get("/orders", searchOrders);
 router.get("/orders/:id", getOrderDetails);
 router.get("/users", searchUsers);

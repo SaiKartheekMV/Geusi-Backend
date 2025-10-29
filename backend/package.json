@@ -8,8 +8,7 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
-    "test:ci": "jest --ci --coverage --watchAll=false",
-    "strip:comments": "node scripts/stripComments.js"
+    "test:ci": "jest --ci --coverage --watchAll=false"
   },
   "author": "Himanshu Sharma",
   "license": "ISC",
@@ -17,7 +16,6 @@
     "bcryptjs": "^3.0.2",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
-    "crypto": "^1.0.1",
     "dotenv": "^17.2.3",
     "express": "^5.1.0",
     "express-rate-limit": "^7.1.5",
