@@ -1,4 +1,4 @@
-const Order = require("../../models/order");
+const Order = require("../../models/Order");
 const Chef = require("../../models/Chef");
 const User = require("../../models/user");
 const { addNotificationToUser } = require("../notificationService");
