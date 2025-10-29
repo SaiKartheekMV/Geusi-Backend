@@ -1,8 +1,8 @@
 const jwt = require("jsonwebtoken");
 const authMiddleware = require("../../middleware/authMiddleware");
-const User = require("../../models/User");
+const User = require("../../models/user");
 
-jest.mock("../../models/User");
+jest.mock("../../models/user");
 jest.mock("jsonwebtoken");
 
 describe("authMiddleware", () => {

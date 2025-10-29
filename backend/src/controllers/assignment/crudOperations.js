@@ -1,149 +1,87 @@
 const Assignment = require("../../models/Assignment");
 const { createAssignmentService, updateAssignmentService, deleteAssignmentService } = require("../../services/assignment/assignmentOperationsService");
+const { sendResponse, sendErrorResponse, asyncHandler, calculatePagination } = require("../../utils/controllerUtils");
 
-const createAssignment = async (req, res) => {
-  try {
-    const assignmentData = req.body;
-    const assignedBy = req.user._id;
-    const io = req.app.get("io");
+const createAssignment = asyncHandler(async (req, res) => {
+  const assignmentData = req.body;
+  const assignedBy = req.user._id;
+  const io = req.app.get("io");
 
-    const result = await createAssignmentService(assignmentData, assignedBy, io);
+  const result = await createAssignmentService(assignmentData, assignedBy, io);
 
-    if (!result.success) {
-      return res.status(400).json({
-        message: result.message,
-        errors: result.errors,
-      });
-    }
-
-    res.status(201).json({
-      message: result.message,
-      assignment: result.assignment,
-    });
-  } catch (error) {
-    console.error("Create assignment error:", error);
-    res.status(500).json({
-      message: "Failed to create assignment",
-      error: error.message,
-    });
+  if (!result.success) {
+    return sendErrorResponse(res, 400, result.message, result.errors);
   }
-};
 
-const getAssignments = async (req, res) => {
-  try {
-    const { userId, chefId, status, assignmentType, page = 1, limit = 10 } = req.query;
-    const skip = (page - 1) * limit;
+  return sendResponse(res, 201, { assignment: result.data }, result.message);
+});
 
-    let query = {};
+const getAssignments = asyncHandler(async (req, res) => {
+  const { userId, chefId, status, assignmentType, page = 1, limit = 10 } = req.query;
 
-    if (userId) query.user = userId;
-    if (chefId) query.chef = chefId;
-    if (status) query.status = status;
-    if (assignmentType) query.assignmentType = assignmentType;
+  let query = {};
 
-    const assignments = await Assignment.find(query)
-      .populate("user", "firstName lastName email phone")
-      .populate("chef", "firstName lastName email phone cuisineSpecialty")
-      .populate("assignedBy", "firstName lastName email")
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(parseInt(limit));
+  if (userId) query.user = userId;
+  if (chefId) query.chef = chefId;
+  if (status) query.status = status;
+  if (assignmentType) query.assignmentType = assignmentType;
 
-    const total = await Assignment.countDocuments(query);
+  const assignments = await Assignment.find(query)
+    .populate("user", "firstName lastName email phone")
+    .populate("chef", "firstName lastName email phone cuisineSpecialty")
+    .populate("assignedBy", "firstName lastName email")
+    .sort({ createdAt: -1 })
+    .skip((page - 1) * limit)
+    .limit(parseInt(limit));
 
-    res.status(200).json({
-      assignments,
-      pagination: {
-        total,
-        page: parseInt(page),
-        pages: Math.ceil(total / limit),
-      },
-    });
-  } catch (error) {
-    console.error("Get assignments error:", error);
-    res.status(500).json({
-      message: "Failed to get assignments",
-      error: error.message,
-    });
+  const total = await Assignment.countDocuments(query);
+  const { pagination } = calculatePagination(page, limit, total);
+
+  return sendResponse(res, 200, {
+    assignments,
+    pagination,
+  }, "Assignments retrieved successfully");
+});
+
+const getAssignmentById = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+
+  const assignment = await Assignment.findById(id)
+    .populate("user", "firstName lastName email phone preferences")
+    .populate("chef", "firstName lastName email phone cuisineSpecialty rating")
+    .populate("assignedBy", "firstName lastName email");
+
+  if (!assignment) {
+    return sendErrorResponse(res, 404, "Assignment not found");
   }
-};
 
-const getAssignmentById = async (req, res) => {
-  try {
-    const { id } = req.params;
+  return sendResponse(res, 200, { assignment }, "Assignment retrieved successfully");
+});
 
-    const assignment = await Assignment.findById(id)
-      .populate("user", "firstName lastName email phone preferences")
-      .populate("chef", "firstName lastName email phone cuisineSpecialty rating")
-      .populate("assignedBy", "firstName lastName email");
+const updateAssignment = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const updates = req.body;
 
-    if (!assignment) {
-      return res.status(404).json({
-        message: "Assignment not found",
-      });
-    }
+  const result = await updateAssignmentService(id, updates);
 
-    res.status(200).json({ assignment });
-  } catch (error) {
-    console.error("Get assignment error:", error);
-    res.status(500).json({
-      message: "Failed to get assignment",
-      error: error.message,
-    });
+  if (!result.success) {
+    return sendErrorResponse(res, 400, result.message, result.errors);
   }
-};
 
-const updateAssignment = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const updates = req.body;
+  return sendResponse(res, 200, { assignment: result.data }, result.message);
+});
 
-    const result = await updateAssignmentService(id, updates);
+const deleteAssignment = asyncHandler(async (req, res) => {
+  const { id } = req.params;
 
-    if (!result.success) {
-      return res.status(400).json({
-        message: result.message,
-        errors: result.errors,
-      });
-    }
+  const result = await deleteAssignmentService(id);
 
-    res.status(200).json({
-      message: result.message,
-      assignment: result.assignment,
-    });
-  } catch (error) {
-    console.error("Update assignment error:", error);
-    res.status(500).json({
-      message: "Failed to update assignment",
-      error: error.message,
-    });
+  if (!result.success) {
+    return sendErrorResponse(res, 400, result.message, result.errors);
   }
-};
 
-const deleteAssignment = async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    const result = await deleteAssignmentService(id);
-
-    if (!result.success) {
-      return res.status(400).json({
-        message: result.message,
-        errors: result.errors,
-      });
-    }
-
-    res.status(200).json({
-      message: result.message,
-    });
-  } catch (error) {
-    console.error("Delete assignment error:", error);
-    res.status(500).json({
-      message: "Failed to delete assignment",
-      error: error.message,
-    });
-  }
-};
+  return sendResponse(res, 200, null, result.message);
+});
 
 module.exports = {
   createAssignment,

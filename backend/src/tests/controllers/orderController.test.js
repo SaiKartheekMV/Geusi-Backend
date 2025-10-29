@@ -14,21 +14,20 @@ const {
   getOrderTimeline,
 } = require("../../controllers/orderController");
 
-const Order = require("../../models/Order");
-const User = require("../../models/User");
+const Order = require("../../models/order");
+const User = require("../../models/user");
 const Chef = require("../../models/Chef");
 const Assignment = require("../../models/Assignment");
 const { sendOrderStatusNotification } = require("../../services/orderNotificationService");
 const { addNotificationToUser } = require("../../services/notificationService");
 
-jest.mock("../../models/Order");
-jest.mock("../../models/User");
+jest.mock("../../models/order");
+jest.mock("../../models/user");
 jest.mock("../../models/Chef");
 jest.mock("../../models/Assignment");
 jest.mock("../../services/orderNotificationService");
 jest.mock("../../services/notificationService");
 
-// Mock the authentication middleware
 jest.mock("../../middleware/authMiddleware", () => ({
   authMiddleware: (req, res, next) => {
     req.user = { _id: "user123" };
@@ -44,7 +43,6 @@ describe("orderController", () => {
     app.use(express.json());
     app.set("io", { emit: jest.fn() });
     
-    // Mock req.user for authenticated routes
     app.use((req, res, next) => {
       req.user = { _id: "user123", role: "user" };
       next();
@@ -242,7 +240,6 @@ describe("orderController", () => {
           quantity: 2,
           deliveryAddress: {
             street: "123 Main St",
-            // Missing city
           },
         },
       };
@@ -640,10 +637,8 @@ describe("orderController", () => {
         save: jest.fn().mockResolvedValue(),
       };
       
-      // Mock Order constructor to return the mock order
       Order.mockImplementation(() => mockOrder);
       
-      // Mock Order.findById to return a mock with chained populate methods
       Order.findById.mockReturnValue({
         populate: jest.fn().mockReturnValue({
           populate: jest.fn().mockResolvedValue(mockOrder),

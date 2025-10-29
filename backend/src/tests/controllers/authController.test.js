@@ -12,10 +12,10 @@ const {
 } = require("../../controllers/authController");
 
 const authService = require("../../services/authService");
-const User = require("../../models/User");
+const User = require("../../models/user");
 
 jest.mock("../../services/authService");
-jest.mock("../../models/User");
+jest.mock("../../models/user");
 
 describe("authController", () => {
   let app;

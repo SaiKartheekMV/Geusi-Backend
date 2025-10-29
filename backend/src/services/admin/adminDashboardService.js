@@ -1,6 +1,6 @@
 const Order = require("../../models/order");
 const Chef = require("../../models/Chef");
-const User = require("../../models/User");
+const User = require("../../models/user");
 const { addNotificationToUser } = require("../notificationService");
 
 const getDashboardStats = async () => {
@@ -22,7 +22,6 @@ const getDashboardStats = async () => {
       updatedAt: { $gte: today },
     });
 
-    // Calculate month-to-date revenue
     const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
     const revenueResult = await Order.aggregate([
       {
@@ -41,7 +40,6 @@ const getDashboardStats = async () => {
 
     const totalRevenue = revenueResult.length > 0 ? revenueResult[0].totalRevenue : 0;
 
-    // Calculate chef acceptance rate
     const totalAssigned = await Order.countDocuments({
       chef: { $ne: null },
       createdAt: { $gte: firstDayOfMonth },
@@ -265,7 +263,6 @@ const assignChef = async (orderId, chefId) => {
     order.status = "confirmed";
     await order.save();
 
-    // Notify user about chef assignment
     await addNotificationToUser(order.user, {
       message: `Chef ${chef.firstName} ${chef.lastName} has been assigned to your order`,
       type: "chef_assigned",
@@ -277,7 +274,6 @@ const assignChef = async (orderId, chefId) => {
       sendEmail: true,
     });
 
-    // Notify chef about new order
     await addNotificationToUser(chefId, {
       message: `New order assigned: ${order.foodName} for ${order.numberOfPersons} persons`,
       type: "order_assigned",

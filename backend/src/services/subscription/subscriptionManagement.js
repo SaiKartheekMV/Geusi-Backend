@@ -1,5 +1,5 @@
 const Assignment = require("../../models/Assignment");
-const Order = require("../../models/Order");
+const Order = require("../../models/order");
 const { generateSubscriptionOrders } = require("./orderGeneration");
 
 const pauseSubscription = async (assignmentId, pauseReason) => {

@@ -1,4 +1,4 @@
-const User = require("../models/User");
+const User = require("../models/user");
 const path = require("path");
 const fs = require("fs");
 const { asyncHandler, sendResponse, sendErrorResponse } = require("../utils/controllerUtils");

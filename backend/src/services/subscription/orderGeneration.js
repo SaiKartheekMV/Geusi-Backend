@@ -1,5 +1,5 @@
 const Assignment = require("../../models/Assignment");
-const Order = require("../../models/Order");
+const Order = require("../../models/order");
 
 const getNextDeliveryDate = (startDate, deliveryDay) => {
   const dayMap = {

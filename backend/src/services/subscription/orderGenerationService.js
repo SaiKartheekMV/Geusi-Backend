@@ -1,5 +1,5 @@
 const Assignment = require("../../models/Assignment");
-const Order = require("../../models/Order");
+const Order = require("../../models/order");
 const { logger } = require("../loggerService");
 
 const createServiceResponse = (success, data = null, message = "", error = null) => {

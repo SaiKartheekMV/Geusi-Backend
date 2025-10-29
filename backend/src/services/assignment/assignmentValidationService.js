@@ -1,5 +1,5 @@
 const Assignment = require("../../models/Assignment");
-const User = require("../../models/User");
+const User = require("../../models/user");
 const Chef = require("../../models/Chef");
 const { logger } = require("../loggerService");
 

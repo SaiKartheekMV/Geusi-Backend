@@ -1,11 +1,10 @@
 const notificationService = require('../../services/notificationService');
 
-// Mock the models
-jest.mock('../../models/User');
+jest.mock('../../models/user');
 jest.mock('../../models/Admin');
 jest.mock('../../models/Chef');
 
-const User = require('../../models/User');
+const User = require('../../models/user');
 const Admin = require('../../models/Admin');
 const Chef = require('../../models/Chef');
 
@@ -270,7 +269,6 @@ describe('Notification Service', () => {
       Admin.findById.mockResolvedValue(null);
       Chef.findById.mockResolvedValue(null);
 
-      // Mock nodemailer transporter
       const mockSendMail = jest.fn().mockResolvedValue();
       const originalTransporter = require('nodemailer').createTransport;
       require('nodemailer').createTransport = jest.fn().mockReturnValue({
@@ -286,7 +284,6 @@ describe('Notification Service', () => {
       expect(result.data.message).toBe('Email notification');
       expect(mockUser.save).toHaveBeenCalled();
 
-      // Restore original transporter
       require('nodemailer').createTransport = originalTransporter;
     });
 
@@ -525,7 +522,6 @@ describe('Notification Service', () => {
       Admin.findById.mockResolvedValue(null);
       Chef.findById.mockResolvedValue(null);
 
-      // Add notification
       const addResult = await notificationService.addNotificationToUser('user123', {
         message: 'Workflow notification',
         type: 'info',
@@ -535,7 +531,6 @@ describe('Notification Service', () => {
       expect(addResult.data.message).toBe('Workflow notification');
       expect(mockUser.notifications).toHaveLength(1);
 
-      // Mark as read
       const mockNotification = {
         _id: 'notification123',
         message: 'Workflow notification',
@@ -594,7 +589,6 @@ describe('Notification Service', () => {
         save: jest.fn().mockResolvedValue(),
       };
 
-      // Clear all mocks and set fresh implementations
       jest.clearAllMocks();
       
       User.findById.mockImplementation((id) => {

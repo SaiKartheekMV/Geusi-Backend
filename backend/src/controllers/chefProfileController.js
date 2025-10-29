@@ -1,37 +1,26 @@
 const Chef = require("../models/Chef");
+const { asyncHandler, sendResponse, sendErrorResponse } = require("../utils/controllerUtils");
 
-/**
- * Get chef profile
- */
-const getChefProfile = async (req, res) => {
-  try {
+const getChefProfile = asyncHandler(async (req, res) => {
     const chefId = req.params.id || req.user._id;
     
     const chef = await Chef.findById(chefId)
       .select("-password -refreshToken -resetPasswordToken -resetPasswordExpires");
     
     if (!chef) {
-      return res.status(404).json({ message: "Chef not found" });
+      return sendErrorResponse(res, 404, "Chef not found");
     }
     
-    return res.status(200).json(chef);
-  } catch (error) {
-    console.error("Error getting chef profile:", error);
-    return res.status(500).json({ message: "Server error" });
-  }
-};
+    return sendResponse(res, 200, { chef }, "Chef profile retrieved successfully");
+});
 
-/**
- * Update chef profile
- */
-const updateChefProfile = async (req, res) => {
-  try {
+const updateChefProfile = asyncHandler(async (req, res) => {
     const { firstName, lastName, cuisineSpecialty, profileImage } = req.body;
     
     const chef = await Chef.findById(req.user._id);
     
     if (!chef) {
-      return res.status(404).json({ message: "Chef not found" });
+      return sendErrorResponse(res, 404, "Chef not found");
     }
     
     if (firstName) chef.firstName = firstName;
@@ -41,8 +30,7 @@ const updateChefProfile = async (req, res) => {
     
     await chef.save();
     
-    return res.status(200).json({ 
-      message: "Profile updated successfully",
+    return sendResponse(res, 200, { 
       chef: {
         _id: chef._id,
         firstName: chef.firstName,
@@ -54,12 +42,8 @@ const updateChefProfile = async (req, res) => {
         rating: chef.rating,
         isAvailable: chef.isAvailable
       }
-    });
-  } catch (error) {
-    console.error("Error updating chef profile:", error);
-    return res.status(500).json({ message: "Server error" });
-  }
-};
+    }, "Profile updated successfully");
+});
 
 module.exports = {
   getChefProfile,

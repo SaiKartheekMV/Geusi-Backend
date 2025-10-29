@@ -14,7 +14,6 @@ const { createAssignmentService, updateAssignmentService, deleteAssignmentServic
 jest.mock("../../models/Assignment");
 jest.mock("../../services/assignment/assignmentOperationsService");
 
-// Mock the authentication middleware
 jest.mock("../../middleware/adminAuthMiddleware", () => ({
   adminAuthMiddleware: (req, res, next) => {
     req.user = { _id: "admin123", role: "admin" };
@@ -23,7 +22,6 @@ jest.mock("../../middleware/adminAuthMiddleware", () => ({
   requirePermission: () => (req, res, next) => next(),
 }));
 
-// Mock the validation middleware
 jest.mock("../../middleware/validationMiddleware", () => ({
   validateRequest: () => (req, res, next) => next(),
   validateParams: () => (req, res, next) => next(),
@@ -48,7 +46,6 @@ describe("assignmentController", () => {
     app = express();
     app.use(express.json());
     
-    // Add assignment routes for integration tests
     const assignmentRoutes = require("../../routes/assignmentRoute");
     app.use("/assignments", assignmentRoutes);
     

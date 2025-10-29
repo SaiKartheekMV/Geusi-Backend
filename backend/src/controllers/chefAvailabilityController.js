@@ -1,45 +1,34 @@
 const Chef = require("../models/Chef");
+const { asyncHandler, sendResponse, sendErrorResponse } = require("../utils/controllerUtils");
 
-/**
- * Get chef's availability
- */
-const getAvailability = async (req, res) => {
-  try {
+const getAvailability = asyncHandler(async (req, res) => {
     const chefId = req.params.id || req.user._id;
     
     const chef = await Chef.findById(chefId).select("availability serviceAreas isAvailable");
     
     if (!chef) {
-      return res.status(404).json({ message: "Chef not found" });
+      return sendErrorResponse(res, 404, "Chef not found");
     }
     
-    return res.status(200).json(chef);
-  } catch (error) {
-    console.error("Error getting chef availability:", error);
-    return res.status(500).json({ message: "Server error" });
-  }
-};
+    return sendResponse(res, 200, { availability: chef.availability, serviceAreas: chef.serviceAreas, isAvailable: chef.isAvailable }, "Chef availability retrieved successfully");
+});
 
-/**
- * Update chef's weekly schedule
- */
-const updateSchedule = async (req, res) => {
-  try {
+const updateSchedule = asyncHandler(async (req, res) => {
     const { schedule } = req.body;
     
     if (!Array.isArray(schedule)) {
-      return res.status(400).json({ message: "Schedule must be an array" });
+      return sendErrorResponse(res, 400, "Schedule must be an array");
     }
     
 
     for (const day of schedule) {
       if (!day.day || !Array.isArray(day.slots)) {
-        return res.status(400).json({ message: "Invalid schedule format" });
+        return sendErrorResponse(res, 400, "Invalid schedule format");
       }
       
       for (const slot of day.slots) {
         if (!slot.startTime || !slot.endTime) {
-          return res.status(400).json({ message: "Each slot must have startTime and endTime" });
+          return sendErrorResponse(res, 400, "Each slot must have startTime and endTime");
         }
       }
     }
@@ -47,34 +36,26 @@ const updateSchedule = async (req, res) => {
     const chef = await Chef.findById(req.user._id);
     
     if (!chef) {
-      return res.status(404).json({ message: "Chef not found" });
+      return sendErrorResponse(res, 404, "Chef not found");
     }
     
     chef.availability.schedule = schedule;
     await chef.save();
     
-    return res.status(200).json({ message: "Schedule updated successfully", schedule: chef.availability.schedule });
-  } catch (error) {
-    console.error("Error updating chef schedule:", error);
-    return res.status(500).json({ message: "Server error" });
-  }
-};
+    return sendResponse(res, 200, { schedule: chef.availability.schedule }, "Schedule updated successfully");
+});
 
-/**
- * Add unavailable dates
- */
-const addUnavailableDates = async (req, res) => {
-  try {
+const addUnavailableDates = asyncHandler(async (req, res) => {
     const { startDate, endDate, reason } = req.body;
     
     if (!startDate || !endDate) {
-      return res.status(400).json({ message: "Start date and end date are required" });
+      return sendErrorResponse(res, 400, "Start date and end date are required");
     }
     
     const chef = await Chef.findById(req.user._id);
     
     if (!chef) {
-      return res.status(404).json({ message: "Chef not found" });
+      return sendErrorResponse(res, 404, "Chef not found");
     }
     
     chef.availability.unavailableDates.push({
@@ -85,27 +66,16 @@ const addUnavailableDates = async (req, res) => {
     
     await chef.save();
     
-    return res.status(200).json({ 
-      message: "Unavailable dates added successfully", 
-      unavailableDates: chef.availability.unavailableDates 
-    });
-  } catch (error) {
-    console.error("Error adding unavailable dates:", error);
-    return res.status(500).json({ message: "Server error" });
-  }
-};
+    return sendResponse(res, 200, { unavailableDates: chef.availability.unavailableDates }, "Unavailable dates added successfully");
+});
 
-/**
- * Remove unavailable dates
- */
-const removeUnavailableDates = async (req, res) => {
-  try {
+const removeUnavailableDates = asyncHandler(async (req, res) => {
     const { dateId } = req.params;
     
     const chef = await Chef.findById(req.user._id);
     
     if (!chef) {
-      return res.status(404).json({ message: "Chef not found" });
+      return sendErrorResponse(res, 404, "Chef not found");
     }
     
     chef.availability.unavailableDates = chef.availability.unavailableDates.filter(
@@ -114,69 +84,40 @@ const removeUnavailableDates = async (req, res) => {
     
     await chef.save();
     
-    return res.status(200).json({ 
-      message: "Unavailable date removed successfully", 
-      unavailableDates: chef.availability.unavailableDates 
-    });
-  } catch (error) {
-    console.error("Error removing unavailable dates:", error);
-    return res.status(500).json({ message: "Server error" });
-  }
-};
+    return sendResponse(res, 200, { unavailableDates: chef.availability.unavailableDates }, "Unavailable date removed successfully");
+});
 
-/**
- * Update service areas
- */
-const updateServiceAreas = async (req, res) => {
-  try {
+const updateServiceAreas = asyncHandler(async (req, res) => {
     const { serviceAreas } = req.body;
     
     if (!Array.isArray(serviceAreas)) {
-      return res.status(400).json({ message: "Service areas must be an array" });
+      return sendErrorResponse(res, 400, "Service areas must be an array");
     }
     
     const chef = await Chef.findById(req.user._id);
     
     if (!chef) {
-      return res.status(404).json({ message: "Chef not found" });
+      return sendErrorResponse(res, 404, "Chef not found");
     }
     
     chef.serviceAreas = serviceAreas;
     await chef.save();
     
-    return res.status(200).json({ 
-      message: "Service areas updated successfully", 
-      serviceAreas: chef.serviceAreas 
-    });
-  } catch (error) {
-    console.error("Error updating service areas:", error);
-    return res.status(500).json({ message: "Server error" });
-  }
-};
+    return sendResponse(res, 200, { serviceAreas: chef.serviceAreas }, "Service areas updated successfully");
+});
 
-/**
- * Toggle availability status
- */
-const toggleAvailability = async (req, res) => {
-  try {
+const toggleAvailability = asyncHandler(async (req, res) => {
     const chef = await Chef.findById(req.user._id);
     
     if (!chef) {
-      return res.status(404).json({ message: "Chef not found" });
+      return sendErrorResponse(res, 404, "Chef not found");
     }
     
     chef.isAvailable = !chef.isAvailable;
     await chef.save();
     
-    return res.status(200).json({ 
-      message: `Chef is now ${chef.isAvailable ? 'available' : 'unavailable'}`, 
-      isAvailable: chef.isAvailable 
-    });
-  } catch (error) {
-    console.error("Error toggling availability:", error);
-    return res.status(500).json({ message: "Server error" });
-  }
-};
+    return sendResponse(res, 200, { isAvailable: chef.isAvailable }, `Chef is now ${chef.isAvailable ? 'available' : 'unavailable'}`);
+});
 
 module.exports = {
   getAvailability,

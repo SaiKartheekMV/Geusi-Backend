@@ -5,178 +5,107 @@ const {
   getSubscriptionStatus,
   updateSubscriptionPreferences,
 } = require("../services/subscriptionService");
+const { sendResponse, sendErrorResponse, asyncHandler, calculatePagination } = require("../utils/controllerUtils");
+const Assignment = require("../models/Assignment");
 
-const createSubscriptionOrders = async (req, res) => {
-  try {
-    const { assignmentId, startDate, endDate } = req.body;
+const createSubscriptionOrders = asyncHandler(async (req, res) => {
+  const { assignmentId, startDate, endDate } = req.body;
 
-    const result = await generateSubscriptionOrders(assignmentId, startDate, endDate);
+  const result = await generateSubscriptionOrders(assignmentId, startDate, endDate);
 
-    if (!result.success) {
-      return res.status(400).json({
-        message: "Failed to generate subscription orders",
-        error: result.error,
-      });
-    }
-
-    res.status(201).json({
-      message: "Subscription orders generated successfully",
-      ordersCreated: result.ordersCreated,
-      orders: result.orders,
-    });
-  } catch (error) {
-    console.error("Create subscription orders error:", error);
-    res.status(500).json({
-      message: "Failed to create subscription orders",
-      error: error.message,
-    });
+  if (!result.success) {
+    return sendErrorResponse(res, 400, "Failed to generate subscription orders", result.error);
   }
-};
 
-const pauseUserSubscription = async (req, res) => {
-  try {
-    const { assignmentId } = req.params;
-    const { reason } = req.body;
+  return sendResponse(res, 201, {
+    ordersCreated: result.ordersCreated,
+    orders: result.orders,
+  }, "Subscription orders generated successfully");
+});
 
-    const result = await pauseSubscription(assignmentId, reason);
+const pauseUserSubscription = asyncHandler(async (req, res) => {
+  const { assignmentId } = req.params;
+  const { reason } = req.body;
 
-    if (!result.success) {
-      return res.status(400).json({
-        message: "Failed to pause subscription",
-        error: result.error,
-      });
-    }
+  const result = await pauseSubscription(assignmentId, reason);
 
-    res.status(200).json({
-      message: result.message,
-    });
-  } catch (error) {
-    console.error("Pause subscription error:", error);
-    res.status(500).json({
-      message: "Failed to pause subscription",
-      error: error.message,
-    });
+  if (!result.success) {
+    return sendErrorResponse(res, 400, "Failed to pause subscription", result.error);
   }
-};
 
-const resumeUserSubscription = async (req, res) => {
-  try {
-    const { assignmentId } = req.params;
+  return sendResponse(res, 200, null, result.message);
+});
 
-    const result = await resumeSubscription(assignmentId);
+const resumeUserSubscription = asyncHandler(async (req, res) => {
+  const { assignmentId } = req.params;
 
-    if (!result.success) {
-      return res.status(400).json({
-        message: "Failed to resume subscription",
-        error: result.error,
-      });
-    }
+  const result = await resumeSubscription(assignmentId);
 
-    res.status(200).json({
-      message: result.message,
-      ordersGenerated: result.ordersGenerated,
-    });
-  } catch (error) {
-    console.error("Resume subscription error:", error);
-    res.status(500).json({
-      message: "Failed to resume subscription",
-      error: error.message,
-    });
+  if (!result.success) {
+    return sendErrorResponse(res, 400, "Failed to resume subscription", result.error);
   }
-};
 
-const getUserSubscriptionStatus = async (req, res) => {
-  try {
-    const { assignmentId } = req.params;
+  return sendResponse(res, 200, {
+    ordersGenerated: result.ordersGenerated,
+  }, result.message);
+});
 
-    const result = await getSubscriptionStatus(assignmentId);
+const getUserSubscriptionStatus = asyncHandler(async (req, res) => {
+  const { assignmentId } = req.params;
 
-    if (!result.success) {
-      return res.status(400).json({
-        message: "Failed to get subscription status",
-        error: result.error,
-      });
-    }
+  const result = await getSubscriptionStatus(assignmentId);
 
-    res.status(200).json({
-      subscription: result.assignment,
-      orderStats: result.orderStats,
-      upcomingOrders: result.upcomingOrders,
-      totalOrders: result.totalOrders,
-    });
-  } catch (error) {
-    console.error("Get subscription status error:", error);
-    res.status(500).json({
-      message: "Failed to get subscription status",
-      error: error.message,
-    });
+  if (!result.success) {
+    return sendErrorResponse(res, 400, "Failed to get subscription status", result.error);
   }
-};
 
-const updateUserSubscriptionPreferences = async (req, res) => {
-  try {
-    const { assignmentId } = req.params;
-    const { preferences } = req.body;
+  return sendResponse(res, 200, {
+    subscription: result.assignment,
+    orderStats: result.orderStats,
+    upcomingOrders: result.upcomingOrders,
+    totalOrders: result.totalOrders,
+  }, "Subscription status retrieved successfully");
+});
 
-    const result = await updateSubscriptionPreferences(assignmentId, preferences);
+const updateUserSubscriptionPreferences = asyncHandler(async (req, res) => {
+  const { assignmentId } = req.params;
+  const { preferences } = req.body;
 
-    if (!result.success) {
-      return res.status(400).json({
-        message: "Failed to update subscription preferences",
-        error: result.error,
-      });
-    }
+  const result = await updateSubscriptionPreferences(assignmentId, preferences);
 
-    res.status(200).json({
-      message: result.message,
-      preferences: result.preferences,
-    });
-  } catch (error) {
-    console.error("Update subscription preferences error:", error);
-    res.status(500).json({
-      message: "Failed to update subscription preferences",
-      error: error.message,
-    });
+  if (!result.success) {
+    return sendErrorResponse(res, 400, "Failed to update subscription preferences", result.error);
   }
-};
 
-const getUserSubscriptions = async (req, res) => {
-  try {
-    const { page = 1, limit = 10 } = req.query;
-    const skip = (page - 1) * limit;
+  return sendResponse(res, 200, {
+    preferences: result.preferences,
+  }, result.message);
+});
 
-    const Assignment = require("../models/Assignment");
+const getUserSubscriptions = asyncHandler(async (req, res) => {
+  const { page = 1, limit = 10 } = req.query;
 
-    const subscriptions = await Assignment.find({
-      user: req.user._id,
-      assignmentType: "subscription",
-    })
-      .populate("chef", "firstName lastName email phone cuisineSpecialty rating")
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(parseInt(limit));
+  const subscriptions = await Assignment.find({
+    user: req.user._id,
+    assignmentType: "subscription",
+  })
+    .populate("chef", "firstName lastName email phone cuisineSpecialty rating")
+    .sort({ createdAt: -1 })
+    .skip((page - 1) * limit)
+    .limit(parseInt(limit));
 
-    const total = await Assignment.countDocuments({
-      user: req.user._id,
-      assignmentType: "subscription",
-    });
+  const total = await Assignment.countDocuments({
+    user: req.user._id,
+    assignmentType: "subscription",
+  });
 
-    res.status(200).json({
-      subscriptions,
-      pagination: {
-        total,
-        page: parseInt(page),
-        pages: Math.ceil(total / limit),
-      },
-    });
-  } catch (error) {
-    console.error("Get user subscriptions error:", error);
-    res.status(500).json({
-      message: "Failed to get user subscriptions",
-      error: error.message,
-    });
-  }
-};
+  const { pagination } = calculatePagination(page, limit, total);
+
+  return sendResponse(res, 200, {
+    subscriptions,
+    pagination,
+  }, "Subscriptions retrieved successfully");
+});
 
 module.exports = {
   createSubscriptionOrders,

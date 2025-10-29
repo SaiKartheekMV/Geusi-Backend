@@ -1,22 +1,17 @@
-const Order = require("../../models/Order");
-const User = require("../../models/User");
+const Order = require("../../models/order");
+const User = require("../../models/user");
 const Chef = require("../../models/Chef");
+const { asyncHandler, sendResponse, sendErrorResponse } = require("../../utils/controllerUtils");
 
-const getNotifications = async (req, res) => {
-  try {
+const getNotifications = asyncHandler(async (req, res) => {
     const user = await User.findById(req.user._id).select("notifications");
 
     const notifications = user.notifications.sort((a, b) => b.createdAt - a.createdAt);
 
-    res.status(200).json({ notifications });
-  } catch (error) {
-    console.error("Get notifications error:", error);
-    res.status(500).json({ message: "Failed to get notifications", error: error.message });
-  }
-};
+    return sendResponse(res, 200, { notifications }, "Notifications retrieved successfully");
+});
 
-const markNotificationRead = async (req, res) => {
-  try {
+const markNotificationRead = asyncHandler(async (req, res) => {
     const { notificationId } = req.params;
 
     await User.findOneAndUpdate(
@@ -29,20 +24,15 @@ const markNotificationRead = async (req, res) => {
       }
     );
 
-    res.status(200).json({ message: "Notification marked as read" });
-  } catch (error) {
-    console.error("Mark notification error:", error);
-    res.status(500).json({ message: "Failed to mark notification", error: error.message });
-  }
-};
+    return sendResponse(res, 200, null, "Notification marked as read");
+});
 
-const rateOrder = async (req, res) => {
-  try {
+const rateOrder = asyncHandler(async (req, res) => {
     const { orderId } = req.params;
     const { rating, review } = req.body;
 
     if (!rating || rating < 1 || rating > 5) {
-      return res.status(400).json({ message: "Rating must be between 1 and 5" });
+      return sendErrorResponse(res, 400, "Rating must be between 1 and 5");
     }
 
     const order = await Order.findOne({
@@ -52,15 +42,11 @@ const rateOrder = async (req, res) => {
     });
 
     if (!order) {
-      return res.status(404).json({ 
-        message: "Order not found or not delivered" 
-      });
+      return sendErrorResponse(res, 404, "Order not found or not delivered");
     }
 
     if (order.userRating && order.userRating.rating) {
-      return res.status(400).json({ 
-        message: "Order has already been rated" 
-      });
+      return sendErrorResponse(res, 400, "Order has already been rated");
     }
 
     order.userRating = {
@@ -75,15 +61,8 @@ const rateOrder = async (req, res) => {
       await updateChefRating(order.chef);
     }
 
-    res.status(200).json({
-      message: "Order rated successfully",
-      order,
-    });
-  } catch (error) {
-    console.error("Rate order error:", error);
-    res.status(500).json({ message: "Failed to rate order", error: error.message });
-  }
-};
+    return sendResponse(res, 200, { order }, "Order rated successfully");
+});
 
 const updateChefRating = async (chefId) => {
   try {
@@ -102,8 +81,7 @@ const updateChefRating = async (chefId) => {
   }
 };
 
-const getOrderTimeline = async (req, res) => {
-  try {
+const getOrderTimeline = asyncHandler(async (req, res) => {
     const { orderId } = req.params;
 
     const order = await Order.findOne({
@@ -112,20 +90,16 @@ const getOrderTimeline = async (req, res) => {
     }).select("orderTimeline foodName status");
 
     if (!order) {
-      return res.status(404).json({ message: "Order not found" });
+      return sendErrorResponse(res, 404, "Order not found");
     }
 
-    res.status(200).json({
+    return sendResponse(res, 200, {
       orderId: order._id,
       foodName: order.foodName,
       currentStatus: order.status,
       timeline: order.orderTimeline,
-    });
-  } catch (error) {
-    console.error("Get order timeline error:", error);
-    res.status(500).json({ message: "Failed to get order timeline", error: error.message });
-  }
-};
+    }, "Order timeline retrieved successfully");
+});
 
 module.exports = {
   getNotifications,
@@ -133,3 +107,5 @@ module.exports = {
   rateOrder,
   getOrderTimeline,
 };
+
+

@@ -1,5 +1,5 @@
 const nodemailer = require("nodemailer");
-const User = require("../models/User");
+const User = require("../models/user");
 const Admin = require("../models/Admin");
 const Chef = require("../models/Chef");
 const { logger } = require("./loggerService");

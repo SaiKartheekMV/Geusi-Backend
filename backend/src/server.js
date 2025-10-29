@@ -23,6 +23,9 @@ app.use(
 app.use(express.urlencoded({ extended: true }));
 app.use(logRequest);
 
+const { authLimiter, generalLimiter } = require("./middleware/rateLimiters");
+app.use("/api", generalLimiter);
+
 const connectDB = async () => {
     try {
         await mongoose.connect(process.env.MONGODB_CONNECTION_STRING);
@@ -82,6 +85,14 @@ app.use("/api/chef-availability", chefAvailabilityRouter);
 app.use("/api/chef-profile", chefProfileRouter);
 app.use("/api/reviews", reviewRouter);
 
+app.use("/api/auth/login", authLimiter);
+app.use("/api/auth/register", authLimiter);
+app.use("/api/auth/forgot-password", authLimiter);
+app.use("/api/auth/reset-password", authLimiter);
+app.use("/api/cook-auth/login", authLimiter);
+app.use("/api/cook-auth/register", authLimiter);
+app.use("/api/admin/login", authLimiter);
+
 app.use(notFoundHandler);
 app.use(errorHandler);
 
@@ -91,7 +102,7 @@ const server = app.listen(PORT, () => {
 
 const { Server } = require("socket.io");
 const jwt = require("jsonwebtoken");
-const User = require("./models/User");
+const User = require("./models/user");
 
 const io = new Server(server, {
     cors: {

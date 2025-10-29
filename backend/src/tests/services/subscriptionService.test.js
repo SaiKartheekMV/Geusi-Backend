@@ -6,7 +6,6 @@ const {
   updateSubscriptionPreferences,
 } = require("../../services/subscriptionService");
 
-// Mock the individual service files
 jest.mock("../../services/subscription/orderGenerationService");
 jest.mock("../../services/subscription/subscriptionManagementService");
 jest.mock("../../services/subscription/statusService");

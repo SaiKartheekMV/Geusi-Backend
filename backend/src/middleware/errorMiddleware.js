@@ -1,8 +1,6 @@
-const { logError } = require("../services/loggerService");
 const { handleControllerError } = require("../utils/controllerUtils");
 
 const errorHandler = (err, req, res, next) => {
-  logError(err, req);
   return handleControllerError(err, req, res, "Middleware");
 };
 

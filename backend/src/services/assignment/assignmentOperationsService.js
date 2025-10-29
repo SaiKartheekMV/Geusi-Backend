@@ -1,5 +1,5 @@
 const Assignment = require("../../models/Assignment");
-const User = require("../../models/User");
+const User = require("../../models/user");
 const Chef = require("../../models/Chef");
 const { sendAssignmentNotification } = require("../orderNotificationService");
 const { 
@@ -10,6 +10,10 @@ const {
 const { createSuccessServiceResponse, createErrorServiceResponse, handleServiceError } = require("../../utils/serviceUtils");
 
 const createAssignmentService = async (assignmentData, assignedBy, io) => {
+  const mongoose = require("mongoose");
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
   try {
     const { userId, chefId, assignmentType, subscriptionDetails, notes } = assignmentData;
 
@@ -21,6 +25,8 @@ const createAssignmentService = async (assignmentData, assignedBy, io) => {
     });
 
     if (!validation.isValid) {
+      await session.abortTransaction();
+      await session.endSession();
       return createErrorServiceResponse("Assignment validation failed", validation.errors);
     }
 
@@ -33,15 +39,22 @@ const createAssignmentService = async (assignmentData, assignedBy, io) => {
       notes,
     });
 
-    await assignment.save();
+    await assignment.save({ session });
 
-    await User.findByIdAndUpdate(userId, {
-      $push: { assignments: assignment._id },
-    });
+    await User.findByIdAndUpdate(
+      userId,
+      { $push: { assignments: assignment._id } },
+      { session }
+    );
 
-    await Chef.findByIdAndUpdate(chefId, {
-      $push: { assignments: assignment._id },
-    });
+    await Chef.findByIdAndUpdate(
+      chefId,
+      { $push: { assignments: assignment._id } },
+      { session }
+    );
+
+    await session.commitTransaction();
+    await session.endSession();
 
     await sendAssignmentNotification(userId, chefId, assignment, io);
 
@@ -52,16 +65,22 @@ const createAssignmentService = async (assignmentData, assignedBy, io) => {
 
     return createSuccessServiceResponse(populatedAssignment, "Assignment created successfully");
   } catch (error) {
+    await session.abortTransaction();
+    await session.endSession();
     return handleServiceError(error, "Create assignment");
   }
 };
 
 const bulkCreateAssignmentsService = async (assignmentsData, assignedBy) => {
+  const mongoose = require("mongoose");
   try {
     const results = [];
     const errors = [];
 
     for (const assignmentData of assignmentsData) {
+      const session = await mongoose.startSession();
+      session.startTransaction();
+
       try {
         const { userId, chefId, assignmentType, subscriptionDetails, notes } = assignmentData;
 
@@ -69,9 +88,11 @@ const bulkCreateAssignmentsService = async (assignmentsData, assignedBy) => {
           user: userId,
           chef: chefId,
           status: { $in: ["active", "suspended"] },
-        });
+        }).session(session);
 
         if (existingAssignment) {
+          await session.abortTransaction();
+          await session.endSession();
           errors.push({
             userId,
             chefId,
@@ -80,10 +101,12 @@ const bulkCreateAssignmentsService = async (assignmentsData, assignedBy) => {
           continue;
         }
 
-        const user = await User.findById(userId);
-        const chef = await Chef.findById(chefId);
+        const user = await User.findById(userId).session(session);
+        const chef = await Chef.findById(chefId).session(session);
 
         if (!user || !chef) {
+          await session.abortTransaction();
+          await session.endSession();
           errors.push({
             userId,
             chefId,
@@ -93,6 +116,8 @@ const bulkCreateAssignmentsService = async (assignmentsData, assignedBy) => {
         }
 
         if (user.accountStatus !== "active" || chef.accountStatus !== "active") {
+          await session.abortTransaction();
+          await session.endSession();
           errors.push({
             userId,
             chefId,
@@ -110,15 +135,22 @@ const bulkCreateAssignmentsService = async (assignmentsData, assignedBy) => {
           notes,
         });
 
-        await assignment.save();
+        await assignment.save({ session });
 
-        await User.findByIdAndUpdate(userId, {
-          $push: { assignments: assignment._id },
-        });
+        await User.findByIdAndUpdate(
+          userId,
+          { $push: { assignments: assignment._id } },
+          { session }
+        );
 
-        await Chef.findByIdAndUpdate(chefId, {
-          $push: { assignments: assignment._id },
-        });
+        await Chef.findByIdAndUpdate(
+          chefId,
+          { $push: { assignments: assignment._id } },
+          { session }
+        );
+
+        await session.commitTransaction();
+        await session.endSession();
 
         results.push({
           userId,
@@ -127,6 +159,8 @@ const bulkCreateAssignmentsService = async (assignmentsData, assignedBy) => {
           status: "success",
         });
       } catch (error) {
+        await session.abortTransaction();
+        await session.endSession();
         errors.push({
           userId: assignmentData.userId,
           chefId: assignmentData.chefId,
@@ -183,31 +217,48 @@ const updateAssignmentService = async (assignmentId, updates) => {
 };
 
 const deleteAssignmentService = async (assignmentId) => {
+  const mongoose = require("mongoose");
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
   try {
     const validation = await validateAssignmentDeletion(assignmentId);
 
     if (!validation.isValid) {
+      await session.abortTransaction();
+      await session.endSession();
       return createErrorServiceResponse("Assignment deletion validation failed", validation.errors);
     }
 
-    const assignment = await Assignment.findById(assignmentId);
+    const assignment = await Assignment.findById(assignmentId).session(session);
 
     if (!assignment) {
+      await session.abortTransaction();
+      await session.endSession();
       return createErrorServiceResponse("Assignment not found");
     }
 
-    await User.findByIdAndUpdate(assignment.user, {
-      $pull: { assignments: assignment._id },
-    });
+    await User.findByIdAndUpdate(
+      assignment.user,
+      { $pull: { assignments: assignment._id } },
+      { session }
+    );
 
-    await Chef.findByIdAndUpdate(assignment.chef, {
-      $pull: { assignments: assignment._id },
-    });
+    await Chef.findByIdAndUpdate(
+      assignment.chef,
+      { $pull: { assignments: assignment._id } },
+      { session }
+    );
 
-    await Assignment.findByIdAndDelete(assignmentId);
+    await Assignment.findByIdAndDelete(assignmentId).session(session);
+
+    await session.commitTransaction();
+    await session.endSession();
 
     return createSuccessServiceResponse(null, "Assignment deleted successfully");
   } catch (error) {
+    await session.abortTransaction();
+    await session.endSession();
     return handleServiceError(error, "Delete assignment");
   }
 };

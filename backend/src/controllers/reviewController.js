@@ -1,13 +1,13 @@
 const Review = require("../models/Review");
 const Chef = require("../models/Chef");
-const Order = require("../models/Order");
+const Order = require("../models/order");
+const { asyncHandler, sendResponse, sendErrorResponse } = require("../utils/controllerUtils");
 
-const createReview = async (req, res) => {
-  try {
+const createReview = asyncHandler(async (req, res) => {
     const { orderId, rating, comment, images } = req.body;
     
     if (!orderId || !rating) {
-      return res.status(400).json({ message: "Order ID and rating are required" });
+      return sendErrorResponse(res, 400, "Order ID and rating are required");
     }
     
 
@@ -18,13 +18,13 @@ const createReview = async (req, res) => {
     });
     
     if (!order) {
-      return res.status(404).json({ message: "Order not found or not eligible for review" });
+      return sendErrorResponse(res, 404, "Order not found or not eligible for review");
     }
     
 
     const existingReview = await Review.findOne({ order: orderId });
     if (existingReview) {
-      return res.status(400).json({ message: "You have already reviewed this order" });
+      return sendErrorResponse(res, 400, "You have already reviewed this order");
     }
     
 
@@ -42,47 +42,29 @@ const createReview = async (req, res) => {
 
     await updateChefRating(order.chef);
     
-    return res.status(201).json({ 
-      message: "Review submitted successfully",
-      review
-    });
-  } catch (error) {
-    console.error("Error creating review:", error);
-    return res.status(500).json({ message: "Server error" });
-  }
-};
+    return sendResponse(res, 201, { review }, "Review submitted successfully");
+});
 
-const getChefReviews = async (req, res) => {
-  try {
+const getChefReviews = asyncHandler(async (req, res) => {
     const { chefId } = req.params;
     
     const reviews = await Review.find({ chef: chefId })
       .populate("user", "firstName lastName profileImage")
       .sort({ createdAt: -1 });
     
-    return res.status(200).json(reviews);
-  } catch (error) {
-    console.error("Error getting chef reviews:", error);
-    return res.status(500).json({ message: "Server error" });
-  }
-};
+    return sendResponse(res, 200, { reviews }, "Chef reviews retrieved successfully");
+});
 
-const getUserReviews = async (req, res) => {
-  try {
+const getUserReviews = asyncHandler(async (req, res) => {
     const reviews = await Review.find({ user: req.user._id })
       .populate("chef", "firstName lastName profileImage")
       .populate("order", "foodName scheduledDate")
       .sort({ createdAt: -1 });
     
-    return res.status(200).json(reviews);
-  } catch (error) {
-    console.error("Error getting user reviews:", error);
-    return res.status(500).json({ message: "Server error" });
-  }
-};
+    return sendResponse(res, 200, { reviews }, "User reviews retrieved successfully");
+});
 
-const updateReview = async (req, res) => {
-  try {
+const updateReview = asyncHandler(async (req, res) => {
     const { reviewId } = req.params;
     const { rating, comment, images } = req.body;
     
@@ -92,13 +74,13 @@ const updateReview = async (req, res) => {
     });
     
     if (!review) {
-      return res.status(404).json({ message: "Review not found" });
+      return sendErrorResponse(res, 404, "Review not found");
     }
     
 
     const daysSinceCreation = (Date.now() - review.createdAt) / (1000 * 60 * 60 * 24);
     if (daysSinceCreation > 7) {
-      return res.status(400).json({ message: "Reviews can only be updated within 7 days of creation" });
+      return sendErrorResponse(res, 400, "Reviews can only be updated within 7 days of creation");
     }
     
     if (rating) review.rating = rating;
@@ -110,18 +92,10 @@ const updateReview = async (req, res) => {
 
     await updateChefRating(review.chef);
     
-    return res.status(200).json({ 
-      message: "Review updated successfully",
-      review
-    });
-  } catch (error) {
-    console.error("Error updating review:", error);
-    return res.status(500).json({ message: "Server error" });
-  }
-};
+    return sendResponse(res, 200, { review }, "Review updated successfully");
+});
 
-const deleteReview = async (req, res) => {
-  try {
+const deleteReview = asyncHandler(async (req, res) => {
     const { reviewId } = req.params;
     
     const review = await Review.findOne({
@@ -130,7 +104,7 @@ const deleteReview = async (req, res) => {
     });
     
     if (!review) {
-      return res.status(404).json({ message: "Review not found" });
+      return sendErrorResponse(res, 404, "Review not found");
     }
     
     const chefId = review.chef;
@@ -140,12 +114,8 @@ const deleteReview = async (req, res) => {
 
     await updateChefRating(chefId);
     
-    return res.status(200).json({ message: "Review deleted successfully" });
-  } catch (error) {
-    console.error("Error deleting review:", error);
-    return res.status(500).json({ message: "Server error" });
-  }
-};
+    return sendResponse(res, 200, null, "Review deleted successfully");
+});
 
 const updateChefRating = async (chefId) => {
   const reviews = await Review.find({ chef: chefId });

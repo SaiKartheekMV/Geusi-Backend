@@ -1,3 +1,5 @@
+const { logError } = require("../services/loggerService");
+
 const asyncHandler = (fn) => {
   return (req, res, next) => {
     Promise.resolve(fn(req, res, next)).catch(next);
@@ -31,7 +33,7 @@ const createErrorResponse = (message, statusCode = 500, error = null) => {
 };
 
 const handleControllerError = (error, req, res, operation = "operation") => {
-  console.error(`${operation} error:`, error);
+  logError(error, req);
 
   if (error.name === "ValidationError") {
     const { statusCode, response } = createErrorResponse(

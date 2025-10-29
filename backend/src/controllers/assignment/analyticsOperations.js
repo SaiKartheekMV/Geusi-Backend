@@ -1,9 +1,9 @@
 const Assignment = require("../../models/Assignment");
-const User = require("../../models/User");
+const User = require("../../models/user");
 const Chef = require("../../models/Chef");
+const { asyncHandler, sendResponse, sendErrorResponse, calculatePagination } = require("../../utils/controllerUtils");
 
-const getAssignmentStats = async (req, res) => {
-  try {
+const getAssignmentStats = asyncHandler(async (req, res) => {
     const { chefId, userId } = req.query;
 
     let matchQuery = {};
@@ -28,25 +28,17 @@ const getAssignmentStats = async (req, res) => {
       status: "active",
     });
 
-    res.status(200).json({
+    return sendResponse(res, 200, {
       stats,
       summary: {
         totalAssignments,
         activeAssignments,
         inactiveAssignments: totalAssignments - activeAssignments,
       },
-    });
-  } catch (error) {
-    console.error("Get assignment stats error:", error);
-    res.status(500).json({
-      message: "Failed to get assignment statistics",
-      error: error.message,
-    });
-  }
-};
+    }, "Assignment statistics retrieved successfully");
+});
 
-const getAvailableChefs = async (req, res) => {
-  try {
+const getAvailableChefs = asyncHandler(async (req, res) => {
     const { cuisineSpecialty, location, excludeUserId } = req.query;
 
     let query = {
@@ -72,23 +64,11 @@ const getAvailableChefs = async (req, res) => {
       return true;
     });
 
-    res.status(200).json({
-      chefs: availableChefs,
-      total: availableChefs.length,
-    });
-  } catch (error) {
-    console.error("Get available chefs error:", error);
-    res.status(500).json({
-      message: "Failed to get available chefs",
-      error: error.message,
-    });
-  }
-};
+    return sendResponse(res, 200, { chefs: availableChefs, total: availableChefs.length }, "Available chefs retrieved successfully");
+});
 
-const getUsersWithoutChef = async (req, res) => {
-  try {
+const getUsersWithoutChef = asyncHandler(async (req, res) => {
     const { page = 1, limit = 10 } = req.query;
-    const skip = (page - 1) * limit;
 
     const usersWithoutChef = await User.aggregate([
       {
@@ -143,25 +123,16 @@ const getUsersWithoutChef = async (req, res) => {
       { $count: "total" },
     ]);
 
-    res.status(200).json({
-      users: usersWithoutChef,
-      pagination: {
-        total: total[0]?.total || 0,
-        page: parseInt(page),
-        pages: Math.ceil((total[0]?.total || 0) / limit),
-      },
-    });
-  } catch (error) {
-    console.error("Get users without chef error:", error);
-    res.status(500).json({
-      message: "Failed to get users without chef",
-      error: error.message,
-    });
-  }
-};
+    const totalCount = total[0]?.total || 0;
+    const { pagination } = calculatePagination(page, limit, totalCount);
+
+    return sendResponse(res, 200, { users: usersWithoutChef, pagination }, "Users without chef retrieved successfully");
+});
 
 module.exports = {
   getAssignmentStats,
   getAvailableChefs,
   getUsersWithoutChef,
 };
+
+
