@@ -4,12 +4,13 @@ const cors = require("cors");
 const mongoose = require("mongoose");
 const helmet = require("helmet");
 const morgan = require("morgan");
+const { logRequest } = require("./services/loggerService");
+const { errorHandler, notFoundHandler } = require("./middleware/errorMiddleware");
 require("dotenv").config();
 
 const app = express();
 const PORT = process.env.PORT || 9000;
 
-// Middleware
 app.use(helmet());
 app.use(morgan("combined"));
 app.use(express.json());
@@ -20,14 +21,11 @@ app.use(
     })
 );
 app.use(express.urlencoded({ extended: true }));
+app.use(logRequest);
 
-// Error handling middleware
-app.use((err, req, res, next) => {
-    console.error(err.stack);
-    res.status(err.status || 500).json({ message: err.message || "Something went wrong!" });
-});
+const { authLimiter, generalLimiter } = require("./middleware/rateLimiters");
+app.use("/api", generalLimiter);
 
-// Database connection
 const connectDB = async () => {
     try {
         await mongoose.connect(process.env.MONGODB_CONNECTION_STRING);
@@ -39,7 +37,6 @@ const connectDB = async () => {
 };
 connectDB();
 
-// Health Check Route
 app.get("/api/health", async (req, res) => {
     try {
         await mongoose.connection.db.admin().ping();
@@ -59,23 +56,95 @@ app.get("/api/health", async (req, res) => {
     }
 });
 
-// Routes 
 const authRouter = require("./routes/authRoute");
 const orderRouter = require("./routes/orderRoute");
 const cookAuthRouter = require("./routes/cookAuthRoute");
 const profileRouter = require("./routes/profileRoute");
-
+const adminRouter = require("./routes/adminRoute");
+const assignmentRouter = require("./routes/assignmentRoute");
+const chefOrderRouter = require("./routes/chefOrderRoute");
+const subscriptionRouter = require("./routes/subscriptionRoute");
+const notificationRouter = require("./routes/notificationRoute");
+const orderTrackingRouter = require("./routes/orderTrackingRoutes");
+const chefAvailabilityRouter = require("./routes/chefAvailabilityRoutes");
+const chefProfileRouter = require("./routes/chefProfileRoutes");
+const reviewRouter = require("./routes/reviewRoutes");
+const searchRouter = require("./routes/searchRoute");
+const paymentRouter = require("./routes/paymentRoute");
 
 app.use("/uploads", express.static("uploads"));
 app.use("/api/auth", authRouter);
 app.use("/api/cook-auth", cookAuthRouter);
 app.use("/api/orders", orderRouter);
 app.use("/api/profile", profileRouter);
+app.use("/api/admin", adminRouter);
+app.use("/api/assignments", assignmentRouter);
+app.use("/api/chef-orders", chefOrderRouter);
+app.use("/api/subscriptions", subscriptionRouter);
+app.use("/api/notifications", notificationRouter);
+app.use("/api/order-tracking", orderTrackingRouter);
+app.use("/api/chef-availability", chefAvailabilityRouter);
+app.use("/api/chef-profile", chefProfileRouter);
+app.use("/api/reviews", reviewRouter);
+app.use("/api/search", searchRouter);
+app.use("/api/payments", paymentRouter);
 
+app.use("/api/auth/login", authLimiter);
+app.use("/api/auth/register", authLimiter);
+app.use("/api/auth/forgot-password", authLimiter);
+app.use("/api/auth/reset-password", authLimiter);
+app.use("/api/cook-auth/login", authLimiter);
+app.use("/api/cook-auth/register", authLimiter);
+app.use("/api/admin/login", authLimiter);
 
+app.use(notFoundHandler);
+app.use(errorHandler);
 
 const server = app.listen(PORT, () => {
     console.log(`Server running on Port: ${PORT}`);
+});
+
+const { Server } = require("socket.io");
+const jwt = require("jsonwebtoken");
+const User = require("./models/user");
+
+const io = new Server(server, {
+    cors: {
+        origin: true,
+        credentials: true,
+    },
+});
+
+app.set("io", io);
+
+const userSockets = new Map();
+
+io.on("connection", async (socket) => {
+    try {
+        const token = socket.handshake.auth?.token;
+        if (!token) return;
+
+        const decoded = jwt.verify(token, process.env.JWT_ACCESS_SECRET);
+        const userId = decoded.userId;
+
+        const existing = userSockets.get(userId) || new Set();
+        existing.add(socket.id);
+        userSockets.set(userId, existing);
+
+        socket.data.userId = userId;
+        socket.join(`user_${userId}`);
+
+        socket.on("disconnect", () => {
+            const set = userSockets.get(userId);
+            if (set) {
+                set.delete(socket.id);
+                if (set.size === 0) userSockets.delete(userId);
+                else userSockets.set(userId, set);
+            }
+        });
+    } catch (err) {
+        return;
+    }
 });
 
 const shutdown = () => {
